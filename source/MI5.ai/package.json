@@ -1,0 +1,22 @@
+{
+  "name": "mi5-ai",
+  "productName": "MI5.ai",
+  "version": "2.0.0",
+  "description": "MI5.ai — desktop assistant with Grok (xAI) support",
+  "main": "main.js",
+  "build": {
+    "appId": "ai.mi5.desktop"
+  },
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "mammoth": "^1.9.1",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

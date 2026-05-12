@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MI5.ai HUD</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: rgba(253, 246, 227, 0.80);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #586e75;
+            font-family: 'Inter', Arial, sans-serif;
+            padding: 24px;
+            margin: 0;
+            border-radius: 16px;
+            border: 1px solid rgba(147, 161, 161, 0.3);
+            height: calc(100vh - 50px);
+            -webkit-app-region: drag; /* allows dragging */
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+        .layout {
+            height: calc(100vh - 50px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow: hidden;
+        }
+        #hudStatus {
+            display: none;
+            flex: 0 0 auto;
+            -webkit-app-region: no-drag;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #586e75;
+            border: 1px dashed rgba(147, 161, 161, 0.55);
+            border-radius: 10px;
+            padding: 8px 10px;
+            background: rgba(238, 232, 213, 0.55);
+            max-height: 120px;
+            overflow-y: auto;
+            font-weight: 500;
+        }
+        #answer {
+            flex: 1 1 auto;
+            min-height: 120px;
+            font-size: 15px;
+            line-height: 1.6;
+            -webkit-app-region: no-drag;
+            white-space: normal;
+            font-weight: 500;
+            overflow-y: auto;
+            padding-right: 6px;
+        }
+        .mi5-answer-root .mi5-prose { margin: 0 0 10px 0; }
+        .mi5-answer-root .mi5-prose:last-child { margin-bottom: 0; }
+        .mi5-code-block {
+            margin: 10px 0;
+            padding: 12px 14px;
+            background: #eee8d5;
+            border: 1px solid rgba(147, 161, 161, 0.55);
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: ui-monospace, "Cascadia Code", "Consolas", "SF Mono", Menlo, monospace;
+            font-size: 13px;
+            line-height: 1.45;
+            tab-size: 4;
+            -moz-tab-size: 4;
+            cursor: pointer;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+            position: relative;
+            padding-top: 28px;
+        }
+        .mi5-code-block::before {
+            content: attr(data-mi5-lang);
+            position: absolute;
+            top: 6px;
+            left: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #657b83;
+            font-family: Inter, sans-serif;
+        }
+        .mi5-code-block code {
+            display: block;
+            white-space: pre;
+            color: #073642;
+            background: transparent;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+        }
+        .mi5-inline-code {
+            font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
+            font-size: 0.92em;
+            background: rgba(238, 232, 213, 0.95);
+            border: 1px solid rgba(147, 161, 161, 0.4);
+            border-radius: 4px;
+            padding: 1px 5px;
+            color: #073642;
+        }
+        .controls {
+            -webkit-app-region: no-drag;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .controls-left, .controls-right {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .btn {
+            border: 1px solid rgba(147, 161, 161, 0.55);
+            background: rgba(238, 232, 213, 0.9);
+            color: #073642;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn:hover { filter: brightness(0.98); }
+        .btn:active { transform: translateY(1px); }
+        .btn.primary {
+            background: rgba(38, 139, 210, 0.14);
+            border-color: rgba(38, 139, 210, 0.45);
+        }
+        .hint {
+            font-size: 11px;
+            color: #657b83;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            user-select: none;
+        }
+        .panel {
+            -webkit-app-region: no-drag;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            border: 1px solid rgba(147, 161, 161, 0.45);
+            background: rgba(238, 232, 213, 0.75);
+            border-radius: 12px;
+            padding: 10px;
+        }
+        .panel.open { display: flex; }
+        .panel textarea {
+            width: 100%;
+            resize: vertical;
+            min-height: 72px;
+            max-height: 220px;
+            border-radius: 10px;
+            border: 1px solid rgba(147, 161, 161, 0.55);
+            padding: 10px 10px;
+            font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace;
+            font-size: 12px;
+            color: #073642;
+            background: rgba(253, 246, 227, 0.9);
+            outline: none;
+        }
+        .panel-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        .status {
+            font-size: 11px;
+            color: #657b83;
+            font-weight: 600;
+            margin-right: auto;
+            user-select: none;
+        }
+        /* Scrollbar customization */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(147, 161, 161, 0.4); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(147, 161, 161, 0.6); }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <div id="hudStatus" aria-live="polite"></div>
+        <div id="answer"><em>MI5.ai ready. Waiting for intercept...</em></div>
+
+        <div class="controls">
+            <div class="controls-left">
+                <button class="btn primary" id="toggleManualBtn" type="button">Manual Ask</button>
+                <span class="hint">Ctrl+Enter to send</span>
+            </div>
+            <div class="controls-right">
+                <button class="btn" id="clearAnswerBtn" type="button">Clear</button>
+            </div>
+        </div>
+
+        <div class="panel" id="manualPanel">
+            <textarea id="manualInput" placeholder="Type or correct the interview question here, then Ctrl+Enter…"></textarea>
+            <div class="panel-actions">
+                <span class="status" id="manualStatus">Standby</span>
+                <button class="btn" id="manualClearBtn" type="button">Clear</button>
+                <button class="btn primary" id="manualAskBtn" type="button">Ask</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        const answerEl = document.getElementById('answer');
+        const toggleManualBtn = document.getElementById('toggleManualBtn');
+        const manualPanel = document.getElementById('manualPanel');
+        const manualInput = document.getElementById('manualInput');
+        const manualAskBtn = document.getElementById('manualAskBtn');
+        const manualClearBtn = document.getElementById('manualClearBtn');
+        const manualStatus = document.getElementById('manualStatus');
+        const clearAnswerBtn = document.getElementById('clearAnswerBtn');
+
+        const hudStatusEl = document.getElementById('hudStatus');
+
+        function setHudStatus(html) {
+            const s = String(html || '').trim();
+            if (!s) {
+                hudStatusEl.innerHTML = '';
+                hudStatusEl.style.display = 'none';
+                return;
+            }
+            hudStatusEl.style.display = 'block';
+            hudStatusEl.innerHTML = s;
+        }
+
+        function setManualOpen(open) {
+            if (open) {
+                manualPanel.classList.add('open');
+                toggleManualBtn.textContent = 'Hide Manual';
+                ipcRenderer.send('overlay-bring-to-front');
+                setTimeout(() => manualInput.focus(), 0);
+            } else {
+                manualPanel.classList.remove('open');
+                toggleManualBtn.textContent = 'Manual Ask';
+            }
+        }
+
+        function manualAsk() {
+            ipcRenderer.send('overlay-bring-to-front');
+            const q = (manualInput.value || '').trim();
+            if (!q) {
+                manualStatus.textContent = 'Type a question first';
+                return;
+            }
+            manualStatus.textContent = 'Sending…';
+            ipcRenderer.send('overlay-manual-ask', q);
+        }
+
+        ipcRenderer.on('update-overlay', (event, data) => {
+            setHudStatus('');
+            answerEl.innerHTML = data;
+            answerEl.scrollTo(0, answerEl.scrollHeight);
+        });
+
+        ipcRenderer.on('update-overlay-status', (event, html) => {
+            setHudStatus(html);
+        });
+
+        ipcRenderer.on('set-manual-draft', (event, draft) => {
+            const t = String(draft || '').trim();
+            if (!t) return;
+            manualInput.value = t;
+            manualStatus.textContent = 'Draft loaded';
+            setManualOpen(true);
+        });
+
+        answerEl.addEventListener('click', (e) => {
+            const pre = e.target.closest('.mi5-code-block');
+            if (!pre) return;
+            const code = pre.querySelector('code');
+            if (!code) return;
+            const range = document.createRange();
+            range.selectNodeContents(code);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            e.preventDefault();
+        });
+
+        toggleManualBtn.addEventListener('click', () => {
+            ipcRenderer.send('overlay-bring-to-front');
+            setManualOpen(!manualPanel.classList.contains('open'));
+        });
+        manualAskBtn.addEventListener('click', manualAsk);
+        manualClearBtn.addEventListener('click', () => { ipcRenderer.send('overlay-bring-to-front'); manualInput.value = ''; manualStatus.textContent = 'Cleared'; manualInput.focus(); });
+        clearAnswerBtn.addEventListener('click', () => { ipcRenderer.send('overlay-bring-to-front'); answerEl.innerHTML = '<em>Cleared.</em>'; setHudStatus(''); });
+
+        manualInput.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                manualAsk();
+            }
+            if (e.key === 'Escape' && manualPanel.classList.contains('open')) {
+                e.preventDefault();
+                setManualOpen(false);
+            }
+        });
+
+        ipcRenderer.on('manual-ack', (event, msg) => {
+            manualStatus.textContent = String(msg || 'Sent');
+        });
+
+        document.addEventListener('pointerdown', () => {
+            ipcRenderer.send('overlay-bring-to-front');
+        }, true);
+    </script>
+</body>
+</html>

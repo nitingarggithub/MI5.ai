@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock interview video — C++</title>
+    <link rel="stylesheet" href="mock_interview_base.css">
+</head>
+<body>
+    <div class="container">
+        <h1>C++ core</h1>
+        <p class="subtitle">Spoken interviewer track · use with MI5 Engage Whisper + Ctrl+Shift+A</p>
+
+        <div class="avatar-wrapper">
+            <div class="avatar-placeholder" id="avatarImage" aria-hidden="true">AI</div>
+        </div>
+
+        <div class="subtitles" id="subtitles">
+            Click Start when MI5 Whisper is armed. Speak your answers aloud or stay silent—the pause window simulates candidate time.
+        </div>
+
+        <div class="controls">
+            <button type="button" id="startBtn">Start Interview</button>
+            <button type="button" id="pauseBtn" disabled>Pause</button>
+            <button type="button" id="resumeBtn" disabled>Resume</button>
+            <button type="button" id="nextBtn" disabled>Skip &gt;&gt;</button>
+        </div>
+    </div>
+
+    <script>
+        const scriptLines = [
+            "Hello — this is a condensed C plus plus screen. We will keep questions tight so you can practice crisp answers.",
+            "First question. Explain RAII and name one STL type that embodies it besides smart pointers.",
+            "{PAUSE}",
+            "Follow-up. What is the rule of five, and when would you intentionally delete or default a special member?",
+            "{PAUSE}",
+            "Moving on — compare std move and std forward in one sentence each, focusing on incorrect uses that break perfect forwarding templates.",
+            "{PAUSE}",
+            "Architecture question. When must a base class destructor be virtual — and what breaks if it is missing?",
+            "{PAUSE}",
+            "Last one. Outline how you would pick between std vector deque and std list for an interview hot path that mostly appends.",
+            "{PAUSE}",
+            "That concludes the C plus plus portion. Strike your whisper hotkey whenever you want MI5 to draft answers from captured audio."
+        ];
+
+        let currentLineIndex = 0;
+        let isInterviewActive = false;
+        const msg = new SpeechSynthesisUtterance();
+        msg.rate = 0.95;
+        msg.pitch = 1;
+
+        const avatar = document.getElementById('avatarImage');
+        const subtitlesDiv = document.getElementById('subtitles');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resumeBtn = document.getElementById('resumeBtn');
+        const nextBtn = document.getElementById('nextBtn');
+
+        function setVoice() {
+            const voices = window.speechSynthesis.getVoices();
+            const preferred = voices.find(v => v.name.includes("Natural") || v.name.includes("UK English") || v.name.includes("Mark") || v.name.includes("Onyx"));
+            msg.voice = preferred || voices.filter(v => v.lang.startsWith("en"))[0] || null;
+        }
+        window.speechSynthesis.onvoiceschanged = setVoice;
+
+        function updateUIControls() {
+            startBtn.disabled = isInterviewActive;
+            pauseBtn.disabled = !isInterviewActive;
+            nextBtn.disabled = !isInterviewActive;
+        }
+
+        function playNextLine() {
+            if (currentLineIndex >= scriptLines.length) {
+                finishInterview();
+                return;
+            }
+            const text = scriptLines[currentLineIndex];
+            if (text === "{PAUSE}") {
+                subtitlesDiv.innerHTML = "<em>(Pause — mimic candidate answer time · MI5 Whisper still accumulates interviewer audio from prior lines.)</em>";
+                subtitlesDiv.className = "subtitles visible highlight";
+                avatar.classList.remove("speaking");
+                setTimeout(() => {
+                    if (isInterviewActive && !window.speechSynthesis.paused) {
+                        currentLineIndex++;
+                        playNextLine();
+                    }
+                }, 11000);
+                return;
+            }
+            subtitlesDiv.className = "subtitles visible";
+            subtitlesDiv.innerText = text;
+            msg.text = text;
+            avatar.classList.add("speaking");
+            window.speechSynthesis.speak(msg);
+        }
+
+        msg.onend = function () {
+            avatar.classList.remove("speaking");
+            if (isInterviewActive) {
+                currentLineIndex++;
+                setTimeout(playNextLine, 700);
+            }
+        };
+        msg.onerror = function () {
+            avatar.classList.remove("speaking");
+        };
+
+        function startInterview() {
+            setVoice();
+            currentLineIndex = 0;
+            isInterviewActive = true;
+            window.speechSynthesis.cancel();
+            subtitlesDiv.classList.add("visible");
+            resumeBtn.disabled = true;
+            updateUIControls();
+            playNextLine();
+        }
+
+        function pauseInterview() {
+            if (window.speechSynthesis.speaking) window.speechSynthesis.pause();
+            avatar.classList.remove("speaking");
+            pauseBtn.disabled = true;
+            resumeBtn.disabled = false;
+        }
+
+        function resumeInterview() {
+            if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+            else if (scriptLines[currentLineIndex] === "{PAUSE}") {
+                currentLineIndex++;
+                playNextLine();
+            }
+            if (msg.text !== "{PAUSE}") avatar.classList.add("speaking");
+            pauseBtn.disabled = false;
+            resumeBtn.disabled = true;
+        }
+
+        function skipNext() {
+            window.speechSynthesis.cancel();
+            avatar.classList.remove("speaking");
+            setTimeout(() => {
+                if (!isInterviewActive) return;
+                currentLineIndex++;
+                playNextLine();
+            }, 120);
+        }
+
+        function finishInterview() {
+            isInterviewActive = false;
+            subtitlesDiv.innerText = "Track complete.";
+            subtitlesDiv.className = "subtitles visible highlight";
+            avatar.classList.remove("speaking");
+            updateUIControls();
+            resumeBtn.disabled = true;
+        }
+
+        startBtn.addEventListener("click", startInterview);
+        pauseBtn.addEventListener("click", pauseInterview);
+        resumeBtn.addEventListener("click", resumeInterview);
+        nextBtn.addEventListener("click", skipNext);
+    </script>
+</body>
+</html>

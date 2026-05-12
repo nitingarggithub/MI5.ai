@@ -1,0 +1,43 @@
+MI5.ai — Engage Whisper (mock “video”) test checklist
+=======================================================
+
+What you are validating
+-----------------------
+• Microphone captures interviewer speech from the HTML mock sessions below (browser Speech Synthesis routing through speakers into the mic — or use Stereo Mix / virtual cable loopback).
+• Groq Whisper accumulates transcripts in ~8 second chunks until you strike Ctrl+Shift+A.
+• The overlay shows a crisp Llama answer using resume + JD + domain memory.
+
+Prerequisites
+-------------
+• Valid Groq API key in Settings (same key used for Whisper + chat).
+• Windows: optionally enable “Stereo mix” or a virtual cable if the mic cannot hear the interviewer tab.
+
+Steps
+-----
+1. Start the app (`npm start` or your packaged build). Open Ctrl+Shift+O for the HUD.
+2. In MI5, click **Engage Whisper Audio** and allow microphone access.
+3. In Chrome or Edge (not Electron), open ONE of:
+   • test/mock_interviews/cpp_mock_interview.html
+   • test/mock_interviews/systemc_mock_interview.html
+   • test/mock_interviews/python_mock_interview.html
+4. Click **Start Interview**. Let each question finish; during “Your turn…” keep Whisper running until the buffer has the question text.
+5. Press **Ctrl+Shift+A** to decode the accumulated buffer and show the drafted answer on the HUD.
+6. Repeat for other tracks; optionally upload resume/JD/domain intel first to check grounding.
+
+Coverage matrix (manual)
+------------------------
+After each Ctrl+Shift+A, confirm:
+[ ] Overlay shows plausible technical content for that stack (C++, SystemC/TLM, or Python).
+[ ] Answer is headline-first, short bullets, no lecture-length filler.
+[ ] Empty buffer shows the “No hostile audio detected yet” path if you pulse A too early.
+
+Note: Whisper quality depends on room noise, accent, and how much interviewer text accumulated before Ctrl+Shift+A.
+
+Rubrics — each track should evoke these themes in MI5 answers (crisp overlays)
+---------------------------------------------------------------
+cpp_mock_interview.html       :: RAII; rule of five; move vs forward; virtual dtor policy; vector vs deque vs list tradeoffs
+
+systemc_mock_interview.html   :: SystemC vs RTL abstraction; TLM perf vs cycle accurate; b_transport vs nb_transport; debug narrative; LT vs AT bring-up
+
+python_mock_interview.html    :: GIL + mitigation; iterators vs generators; __getitem__ vs __getattr__ / descriptors; asyncio non-blocking pitfalls; tuple vs named API returns
+

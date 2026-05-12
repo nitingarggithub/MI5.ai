@@ -1,0 +1,44 @@
+MI5 HUD — manual screen-share stealth check (Teams + HackerRank)
+================================================================
+
+Prerequisite: Windows 10 version 2004 or later (or Windows 11) for best
+results. The overlay uses Electron content protection (OS capture exclusion).
+Older Windows builds may show a black rectangle instead of full exclusion.
+
+What we cannot guarantee as “100%”
+-----------------------------------
+• “Share this window” only — if you share a single app window, the HUD is a
+  different process; it usually does not appear in that window’s stream anyway.
+• Third-party capture drivers, game bar variants, or corporate DRM that ignore
+  SetWindowDisplayAffinity.
+• macOS: different stack; verify locally (Zoom/Teams often respect it).
+
+Quick local sanity check (no Teams)
+------------------------------------
+1. npm start → Ctrl+Shift+O to show HUD with obvious text.
+2. Win+Shift+S (Snipping Tool / screenshot) over the desktop, or Xbox Game Bar
+   capture if enabled.
+3. Expected: HUD area excluded or blacked per OS policy — not readable as MI5.
+
+Microsoft Teams
+-----------------
+1. Join a meeting from another device or “Meet now” + mobile viewer.
+2. Share **Entire screen** (not single window). Keep MI5 HUD visible on top.
+3. On the remote viewer, confirm the HUD is not visible (or is a blank region),
+   while the browser / IDE / HackerRank tab remains normal.
+
+HackerRank (browser)
+--------------------
+1. Open a practice tab; pin MI5 HUD over the editor area.
+2. Use Teams (or Meet) **full desktop** share toward a second client.
+3. Confirm remote view shows no readable HUD over the assessment.
+
+Regression: MI5 Phantom OCR (Ctrl+Shift+S)
+-----------------------------------------
+Content-protected windows may be omitted from Chromium desktop thumbnails.
+If your own screenshot preview never shows the HUD, that is expected and
+desirable for stealth; the interview content should still capture.
+
+If the HUD still leaks in Teams after this build, note OS build (winver),
+Teams version, and whether share mode was desktop vs window — file an issue
+with those details.

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MI5.ai · Mock Interview — SystemC / TLM</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 800px;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+
+        .avatar-wrapper {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            margin: 0 auto;
+            border-radius: 50%;
+            overflow: visible;
+        }
+
+        .avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #3b82f6;
+            z-index: 10;
+            position: relative;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            transition: transform 0.3s ease;
+        }
+
+        .avatar.speaking {
+            animation: pulse-ring 1.5s infinite alternate;
+        }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); border-color: #3b82f6; }
+            100% { box-shadow: 0 0 40px rgba(192, 132, 252, 0.8), 0 0 20px rgba(96, 165, 250, 0.6); border-color: #c084fc; transform: scale(1.02); }
+        }
+
+        .subtitles {
+            margin-top: 2rem;
+            min-height: 80px;
+            font-size: 1.25rem;
+            line-height: 1.5;
+            color: #e2e8f0;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid #60a5fa;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .subtitles.visible {
+            opacity: 1;
+        }
+
+        .subtitles.highlight {
+            color: #fbbf24; 
+        }
+
+        .controls {
+            margin-top: 2.5rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #475569;
+            color: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>SystemC & TLM</h1>
+        <p class="subtitle">MI5.ai · Mock Interview Simulator</p>
+
+        <div class="avatar-wrapper">
+            <!-- Ensure avatar.png is in the same directory as this file -->
+            <img src="avatar.png" alt="AI Interviewer" class="avatar" id="avatarImage">
+        </div>
+
+        <div class="subtitles" id="subtitles">
+            Click Start when you are ready. The interviewer will ask a question, pause for you to answer, and then continue. You can pause the interview if you need more time to speak.
+        </div>
+
+        <div class="controls">
+            <button id="startBtn">Start Interview</button>
+            <button id="pauseBtn" disabled>Pause</button>
+            <button id="resumeBtn" disabled>Resume</button>
+            <button id="nextBtn" disabled>Skip &gt;&gt;</button>
+        </div>
+    </div>
+
+    <script>
+        const scriptLines = [
+            "Hello, and thank you for taking the time to interview with our hardware-software co-design team today. We're going to focus primarily on system-level modeling.",
+            "To start, could you explain the fundamental difference between SystemC and traditional hardware description languages like Verilog or VHDL? I'm particularly interested in when you would choose one over the other.",
+            "{PAUSE}",
+            "Great. Let's move on to Transaction Level Modeling. How exactly does TLM-2.0 improve simulation performance compared to pin-accurate models?",
+            "Furthermore, could you briefly explain the difference between blocking and non-blocking transports in this context?",
+            "{PAUSE}",
+            "Thank you. Finally, tell me about a time you encountered a synchronization issue or timing bug while using TLM payloads or sockets. How did you go about debugging and resolving it?",
+            "{PAUSE}",
+            "That concludes our technical questions. Take your time to finish your thoughts, and good luck with the rest of your interviews!"
+        ];
+
+        let currentLineIndex = 0;
+        let isInterviewActive = false;
+        let msg = new SpeechSynthesisUtterance();
+        
+        // Voice config
+        msg.rate = 0.95; // slightly slower for a professional tone
+        msg.pitch = 1;
+
+        const avatar = document.getElementById('avatarImage');
+        const subtitlesDiv = document.getElementById('subtitles');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resumeBtn = document.getElementById('resumeBtn');
+        const nextBtn = document.getElementById('nextBtn');
+
+        // Select a good english female or male voice if available
+        function setVoice() {
+            const voices = window.speechSynthesis.getVoices();
+            // try finding a specific voice: Google UK English Female, Microsoft Mark, Microsoft Zira, etc.
+            const preferredVoice = voices.find(v => v.name.includes("Natural") || v.name.includes("UK English") || v.name.includes("Mark") || v.name.includes("Onyx"));
+            if(preferredVoice) {
+                msg.voice = preferredVoice;
+            } else {
+                const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+                if (englishVoices.length > 0) msg.voice = englishVoices[0];
+            }
+        }
+        
+        window.speechSynthesis.onvoiceschanged = setVoice;
+
+        function updateUIControls() {
+            startBtn.disabled = isInterviewActive;
+            pauseBtn.disabled = !isInterviewActive;
+            nextBtn.disabled = !isInterviewActive;
+        }
+
+        function playNextLine() {
+            if (currentLineIndex >= scriptLines.length) {
+                finishInterview();
+                return;
+            }
+
+            const text = scriptLines[currentLineIndex];
+            
+            if (text === "{PAUSE}") {
+                // It's the user's turn
+                subtitlesDiv.innerHTML = "<em>(Your turn to answer. The AI is listening...)</em>";
+                subtitlesDiv.className = "subtitles visible highlight";
+                avatar.classList.remove('speaking');
+                
+                // Pause for a few seconds automatically, or user can click 'Skip'
+                setTimeout(() => {
+                    if(isInterviewActive && !window.speechSynthesis.paused) {
+                         currentLineIndex++;
+                         playNextLine();
+                    }
+                }, 10000); // 10 second pause, just as a buffer, they can pause
+                return;
+            }
+
+            // Normal speaking text
+            subtitlesDiv.className = "subtitles visible";
+            subtitlesDiv.innerText = text;
+            msg.text = text;
+            
+            avatar.classList.add('speaking');
+            window.speechSynthesis.speak(msg);
+        }
+
+        msg.onend = function() {
+            avatar.classList.remove('speaking');
+            if(isInterviewActive) {
+                currentLineIndex++;
+                setTimeout(playNextLine, 800); // slight pause between sentences
+            }
+        };
+
+        msg.onerror = function() {
+            avatar.classList.remove('speaking');
+            console.error("SpeechSynthesis Error");
+        };
+
+        function startInterview() {
+            setVoice();
+            currentLineIndex = 0;
+            isInterviewActive = true;
+            window.speechSynthesis.cancel(); // clear queue
+            subtitlesDiv.classList.add('visible');
+            updateUIControls();
+            playNextLine();
+        }
+
+        function pauseInterview() {
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.pause();
+            }
+            avatar.classList.remove('speaking');
+            pauseBtn.disabled = true;
+            resumeBtn.disabled = false;
+        }
+
+        function resumeInterview() {
+            if (window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+            } else if (scriptLines[currentLineIndex] === "{PAUSE}") {
+                // manually move past pause block
+                currentLineIndex++;
+                playNextLine();
+            }
+            if (msg.text !== "{PAUSE}") {
+                avatar.classList.add('speaking');
+            }
+            pauseBtn.disabled = false;
+            resumeBtn.disabled = true;
+        }
+
+        function skipNext() {
+            window.speechSynthesis.cancel(); // stops current speech
+            // onend event won't reliably fire if canceled entirely, so manually advance
+            if (scriptLines[currentLineIndex] === "{PAUSE}") {
+                currentLineIndex++;
+            }
+            // speech cancel triggers onend which auto-advances, but we shouldn't rely on it safely overlapping
+            setTimeout(() => {
+                if(!window.speechSynthesis.speaking && isInterviewActive) {
+                    playNextLine();
+                }
+            }, 100);
+        }
+
+        function finishInterview() {
+            isInterviewActive = false;
+            subtitlesDiv.innerText = "Interview Complete. Great job!";
+            subtitlesDiv.className = "subtitles visible highlight";
+            avatar.classList.remove('speaking');
+            updateUIControls();
+            resumeBtn.disabled = true;
+        }
+
+        startBtn.addEventListener('click', startInterview);
+        pauseBtn.addEventListener('click', pauseInterview);
+        resumeBtn.addEventListener('click', resumeInterview);
+        nextBtn.addEventListener('click', skipNext);
+
+    </script>
+</body>
+</html>

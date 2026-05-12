@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock interview video — SystemC / TLM</title>
+    <link rel="stylesheet" href="mock_interview_base.css">
+</head>
+<body>
+    <div class="container">
+        <h1>SystemC &amp; TLM</h1>
+        <p class="subtitle">Spoken interviewer track · MI5 Whisper + Ctrl+Shift+A</p>
+
+        <div class="avatar-wrapper">
+            <div class="avatar-placeholder" id="avatarImage" aria-hidden="true">AI</div>
+        </div>
+
+        <div class="subtitles" id="subtitles">
+            Click Start when MI5 Whisper is armed. Pause segments simulate time for candidate responses.
+        </div>
+
+        <div class="controls">
+            <button type="button" id="startBtn">Start Interview</button>
+            <button type="button" id="pauseBtn" disabled>Pause</button>
+            <button type="button" id="resumeBtn" disabled>Resume</button>
+            <button type="button" id="nextBtn" disabled>Skip &gt;&gt;</button>
+        </div>
+    </div>
+
+    <script>
+        const scriptLines = [
+            "Hello — we will focus on system level modeling co design with System C.",
+            "What is fundamentally different between System C and RTL languages such as Verilog or VHDL, and when do you graduate from one to the other?",
+            "{PAUSE}",
+            "Explain how transaction level modeling T L M improves throughput versus cycle accurate interconnect models.",
+            "{PAUSE}",
+            "Contrast blocking versus non blocking transport sockets in roughly two sentences each.",
+            "{PAUSE}",
+            "Debugging story. Describe a timing or ordering bug you chased in a loosely timed model and which instruments or traces proved decisive.",
+            "{PAUSE}",
+            "Wrap up question. Where do you insist on loosely timed sockets versus approximately timed for first pass firmware bring up?",
+            "{PAUSE}",
+            "Good luck — pulse your Whisper hot key so MI5 can answer from buffered audio."
+        ];
+
+        let currentLineIndex = 0;
+        let isInterviewActive = false;
+        const msg = new SpeechSynthesisUtterance();
+        msg.rate = 0.95;
+        msg.pitch = 1;
+
+        const avatar = document.getElementById('avatarImage');
+        const subtitlesDiv = document.getElementById('subtitles');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resumeBtn = document.getElementById('resumeBtn');
+        const nextBtn = document.getElementById('nextBtn');
+
+        function setVoice() {
+            const voices = window.speechSynthesis.getVoices();
+            const preferred = voices.find(v => v.name.includes("Natural") || v.name.includes("UK English") || v.name.includes("Mark") || v.name.includes("Onyx"));
+            msg.voice = preferred || voices.filter(v => v.lang.startsWith("en"))[0] || null;
+        }
+        window.speechSynthesis.onvoiceschanged = setVoice;
+
+        function updateUIControls() {
+            startBtn.disabled = isInterviewActive;
+            pauseBtn.disabled = !isInterviewActive;
+            nextBtn.disabled = !isInterviewActive;
+        }
+
+        function playNextLine() {
+            if (currentLineIndex >= scriptLines.length) {
+                finishInterview();
+                return;
+            }
+            const text = scriptLines[currentLineIndex];
+            if (text === "{PAUSE}") {
+                subtitlesDiv.innerHTML = "<em>(Pause — candidate window.)</em>";
+                subtitlesDiv.className = "subtitles visible highlight";
+                avatar.classList.remove("speaking");
+                setTimeout(() => {
+                    if (isInterviewActive && !window.speechSynthesis.paused) {
+                        currentLineIndex++;
+                        playNextLine();
+                    }
+                }, 11000);
+                return;
+            }
+            subtitlesDiv.className = "subtitles visible";
+            subtitlesDiv.innerText = text;
+            msg.text = text;
+            avatar.classList.add("speaking");
+            window.speechSynthesis.speak(msg);
+        }
+
+        msg.onend = function () {
+            avatar.classList.remove("speaking");
+            if (isInterviewActive) {
+                currentLineIndex++;
+                setTimeout(playNextLine, 700);
+            }
+        };
+        msg.onerror = function () {
+            avatar.classList.remove("speaking");
+        };
+
+        function startInterview() {
+            setVoice();
+            currentLineIndex = 0;
+            isInterviewActive = true;
+            window.speechSynthesis.cancel();
+            subtitlesDiv.classList.add("visible");
+            resumeBtn.disabled = true;
+            updateUIControls();
+            playNextLine();
+        }
+
+        function pauseInterview() {
+            if (window.speechSynthesis.speaking) window.speechSynthesis.pause();
+            avatar.classList.remove("speaking");
+            pauseBtn.disabled = true;
+            resumeBtn.disabled = false;
+        }
+
+        function resumeInterview() {
+            if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+            else if (scriptLines[currentLineIndex] === "{PAUSE}") {
+                currentLineIndex++;
+                playNextLine();
+            }
+            if (msg.text !== "{PAUSE}") avatar.classList.add("speaking");
+            pauseBtn.disabled = false;
+            resumeBtn.disabled = true;
+        }
+
+        function skipNext() {
+            window.speechSynthesis.cancel();
+            avatar.classList.remove("speaking");
+            setTimeout(() => {
+                if (!isInterviewActive) return;
+                currentLineIndex++;
+                playNextLine();
+            }, 120);
+        }
+
+        function finishInterview() {
+            isInterviewActive = false;
+            subtitlesDiv.innerText = "Track complete.";
+            subtitlesDiv.className = "subtitles visible highlight";
+            avatar.classList.remove("speaking");
+            updateUIControls();
+            resumeBtn.disabled = true;
+        }
+
+        startBtn.addEventListener("click", startInterview);
+        pauseBtn.addEventListener("click", pauseInterview);
+        resumeBtn.addEventListener("click", resumeInterview);
+        nextBtn.addEventListener("click", skipNext);
+    </script>
+</body>
+</html>

@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MI5.ai</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Solarized Light Palette */
+            --bg: #fdf6e3;
+            --glass: rgba(238, 232, 213, 0.7);
+            --border: rgba(147, 161, 161, 0.3);
+            --text-main: #657b83;
+            --text-dark: #eee8d5; /* Light text for buttons */
+            --header: #586e75;
+            --accent-blue: #268bd2;
+            --accent-blue-hover: #1f71aa;
+            --accent-magenta: #d33682;
+            --accent-green: #2aa198; /* cyan-green */
+            --accent-red: #dc322f;
+        }
+
+        body { 
+            font-family: 'Inter', Arial, sans-serif; 
+            padding: 20px 40px; 
+            background: var(--bg); 
+            color: var(--text-main); 
+            max-width: 1000px; 
+            margin: 0 auto; 
+        }
+
+        h1 { color: var(--header); font-weight: 700; display: flex; align-items: center; gap: 10px; margin-bottom: 30px; letter-spacing: -0.5px;}
+        h3 { color: var(--header); font-weight: 600; margin-top: 5px; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+
+        .card { 
+            background: var(--glass); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 25px; 
+            border-radius: 16px; 
+            margin-bottom: 25px; 
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04); 
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08); }
+
+        input, select, textarea { 
+            padding: 12px; 
+            margin-top: 5px; 
+            width: calc(100% - 26px); 
+            border-radius: 8px; 
+            border: 1px solid rgba(147, 161, 161, 0.5); 
+            background: rgba(253, 246, 227, 0.9); 
+            color: var(--header); 
+            font-family: 'Inter', sans-serif;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-blue); }
+        
+        input[type="file"] { padding: 5px; margin-bottom: 5px; cursor: pointer; border: none; background: transparent; width: 100%;}
+        input[type="file"]::file-selector-button { 
+            background: var(--text-main); 
+            color: var(--bg); 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        input[type="file"]::file-selector-button:hover { background: var(--header); }
+
+        label { font-weight: 600; font-size: 0.9em; color: var(--header); }
+        
+        button { 
+            background: var(--accent-green); 
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 600; 
+            transition: all 0.2s; 
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 4px 12px rgba(42, 161, 152, 0.3);
+        }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(42, 161, 152, 0.4); }
+        button:active { transform: translateY(1px); }
+
+        .btn-blue { background: var(--accent-blue); box-shadow: 0 4px 12px rgba(38, 139, 210, 0.3); }
+        .btn-magenta { background: var(--accent-magenta); box-shadow: 0 4px 12px rgba(211, 54, 130, 0.3); }
+        .btn-red { background: var(--accent-red); box-shadow: 0 4px 12px rgba(220, 50, 47, 0.3); }
+        .btn-ghost { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); box-shadow: none; }
+        .btn-ghost:hover { background: rgba(220, 50, 47, 0.1); box-shadow: none; }
+        .btn-disabled { background: #ccc; cursor: not-allowed; box-shadow: none; color: #666; }
+        .btn-disabled:hover { filter: none; transform: none; }
+
+        .row { display: flex; gap: 20px; margin-bottom: 10px; }
+        .col { flex: 1; display: flex; flex-direction: column; }
+        
+        #status { margin-top: 15px; padding: 12px; border-radius: 8px; display: none; font-weight: 500; font-size: 0.9em;}
+        .success { color: #859900; font-weight: 500; display: block; margin-top: 4px;}
+        .warning { color: #b58900; font-weight: 500; display: block; margin-top: 4px;}
+        .error { color: var(--accent-red); font-weight: 500; display: block; margin-top: 4px;}
+
+        /* Settings Modal */
+        dialog {
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            background: var(--bg);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            width: 500px;
+            color: var(--text-main);
+        }
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(4px);
+        }
+        
+    </style>
+</head>
+<body>
+
+    <h1>🕵️‍♂️ MI5.ai Dashboard</h1>
+
+    <!-- Hidden Settings Dialog -->
+    <dialog id="settingsModal">
+        <h3 style="margin-top:0;">API Engine Configuration</h3>
+        <p style="font-size: 0.9em; margin-bottom: 20px;">Configure your backend Intel servers.</p>
+        <div style="margin-bottom: 15px;">
+            <label>LLM Provider</label>
+            <select id="modelSelect">
+                <option value="groq">Groq (Llama 3.3 70B - Recommended)</option>
+                <option value="grok">Grok (xAI)</option>
+                <option value="openrouter">OpenRouter (Free Tier)</option>
+            </select>
+        </div>
+        <div style="margin-bottom: 25px;">
+            <label>API Key</label>
+            <input type="password" id="apiKey" placeholder="Enter API Key (e.g. gsk_...)">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="document.getElementById('settingsModal').close()" class="btn-ghost" style="border:1px solid #ccc; color:var(--text-main);">Cancel</button>
+            <button onclick="saveConfig()" class="btn-blue">Save Configuration</button>
+        </div>
+    </dialog>
+
+    <div class="card" style="border-left: 4px solid var(--accent-blue);">
+        <h3>1. Blueprint Context</h3>
+        <p style="font-size: 0.9em; margin-bottom: 15px;">Upload the Target's Resume and Mission Parameters (JD).</p>
+        <div class="row">
+            <div class="col">
+                <label>Target Resume (.pdf, .docx)</label>
+                <input type="file" id="resumeFile" accept=".pdf,.docx,.txt" onchange="parseFile('resumeFile', 'resumeContext')">
+                <div id="resumeStatus" style="font-size: 0.85em;" class="success"></div>
+            </div>
+            <div class="col">
+                <label>Job Description</label>
+                <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                    <input type="text" id="jdUrl" placeholder="Paste Mission URL..." style="margin-top:0; flex: 1;">
+                    <button onclick="fetchJdUrl()" class="btn-blue" style="margin-top:0; padding: 10px 15px;">Scrape</button>
+                </div>
+                <input type="file" id="jdFile" accept=".pdf,.docx,.txt" onchange="parseFile('jdFile', 'jdContext')">
+                <div id="jdStatus" style="font-size: 0.85em;" class="success"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--accent-magenta);">
+        <h3>2. Deep-Dive Intel (Cumulative)</h3>
+        <p style="font-size: 0.9em; margin-bottom: 15px;">Inject architecture docs or scrape entire documentation libraries. Accumulates silently.</p>
+        <div class="row">
+            <div class="col">
+                <label>Tech Specs (Batch Upload)</label>
+                <input type="file" id="domainFiles" multiple accept=".pdf,.docx,.txt" onchange="parseDomainFiles()">
+            </div>
+            <div class="col">
+                <label>Scrape Remote Server URL</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="domainUrl" placeholder="Enter remote URL..." style="margin-top:0; flex: 1;">
+                    <button onclick="appendDomainUrl()" class="btn-magenta" style="margin-top:0; padding: 10px 15px;">Inject</button>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex; justify-content: space-between; align-items: baseline; margin-top: 15px;">
+            <div id="domainStatus" style="font-size: 0.85em;" class="success"></div>
+            <button onclick="clearDomainKnowledge()" class="btn-ghost">Wipe Memory Bank</button>
+        </div>
+        <textarea id="domainViewer" rows="3" readonly placeholder="Accumulated raw intel will parse here..."></textarea>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--accent-red);">
+        <h3>3. Active Operations</h3>
+        <p>Press <strong>Ctrl+Shift+O</strong> to toggle the MI5.ai HUD overlay.</p>
+        
+        <div style="background: rgba(253, 246, 227, 0.5); padding: 15px; border-radius: 8px; margin-top: 15px;">
+            <p style="color:var(--accent-red); font-size: 0.95em; margin-top:0;"><strong>🔥 Phantom OCR:</strong> Hit <strong>Ctrl+Shift+S</strong> globally to snap the hostile screen and solve silently.</p>
+            <p style="color:var(--accent-blue); font-size: 0.95em; margin-bottom:0;"><strong>🎙️ Audio Tracker:</strong> Pick your headset in <strong>Interview microphone</strong> below (Jabra, etc.), then <strong>Engage Whisper</strong>. Wait ~10s after the interviewer finishes, then <strong>Ctrl+Shift+A</strong>. For remote audio only, you still need loopback / Stereo Mix — the headset mic hears <em>you</em>, not Teams playback.</p>
+        </div>
+
+        <div style="margin-top: 14px;">
+            <label style="display:block; font-weight:600; font-size:0.9em; color: var(--header);">Interview microphone (Whisper)</label>
+            <p style="font-size: 0.85em; margin: 6px 0 8px 0;">USB headset: plug in, click <strong>Refresh microphone list</strong>, choose the Jabra input, then start Engage again if it was already running.</p>
+            <select id="micSelect" onchange="onMicSelectChange()"></select>
+            <div style="margin-top: 10px;">
+                <button type="button" onclick="refreshMicInputList()" class="btn-blue" style="padding: 10px 16px;">Refresh microphone list</button>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 15px; align-items: baseline; margin-top: 20px;">
+            <button onclick="startListeningClipboard()" class="btn-blue">Track Clipboard</button>
+            <button onclick="stopListeningClipboard()" class="btn-disabled">Halt</button>
+            <span id="clipboardStatus" style="font-size: 0.85em; font-weight:600;">Standby</span>
+        </div>
+
+        <div style="display: flex; gap: 15px; align-items: baseline; margin-top: 15px;">
+            <button onclick="startSpeechMonitor()" class="btn-red">Engage Whisper Audio</button>
+            <button onclick="stopSpeechMonitor()" class="btn-disabled">Halt</button>
+            <span id="speechStatus" style="font-size: 0.85em; font-weight:600;">Standby</span>
+        </div>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const fs = require('fs');
+        const path = require('path');
+        const { ipcRenderer, clipboard } = require('electron');
+
+        // Modal Trigger Logic
+        ipcRenderer.on('open-settings', () => {
+            const modal = document.getElementById('settingsModal');
+            modal.showModal();
+            setTimeout(function () { try { refreshMicInputList(); } catch (e) {} }, 50);
+        });
+
+        const storePath = path.join(__dirname, 'store.json');
+        
+        let store = {
+            model: 'groq',
+            apiKey: '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',
+            resumeContext: '',
+            jdContext: '',
+            domainContext: '',
+            audioInputDeviceId: ''
+        };
+
+        try {
+            if (fs.existsSync(storePath)) {
+                const data = JSON.parse(fs.readFileSync(storePath, 'utf8'));
+                store = { ...store, ...data };
+            } else {
+                fs.writeFileSync(storePath, JSON.stringify(store));
+            }
+        } catch (e) { console.error("Config load error"); }
+        if (store.audioInputDeviceId == null) store.audioInputDeviceId = '';
+
+        document.getElementById('modelSelect').value = store.model;
+        document.getElementById('apiKey').value = store.apiKey;
+        if (store.resumeContext) document.getElementById('resumeStatus').innerText = "Intel Uploaded";
+        if (store.jdContext) document.getElementById('jdStatus').innerText = "Intel Uploaded";
+        updateDomainViewer();
+
+        function saveConfig() {
+            store.model = document.getElementById('modelSelect').value;
+            store.apiKey = document.getElementById('apiKey').value;
+            const ms = document.getElementById('micSelect');
+            if (ms) store.audioInputDeviceId = (ms.value || '').trim();
+            persistStore();
+            document.getElementById('settingsModal').close();
+            showStatus('✅ Engine Configuration saved successfully.', 'rgba(133, 153, 0, 0.2)');
+        }
+
+        function persistStore() { fs.writeFileSync(storePath, JSON.stringify(store)); }
+
+        function buildAudioInputConstraints() {
+            const audio = {
+                echoCancellation: { ideal: true },
+                noiseSuppression: { ideal: true },
+                autoGainControl: { ideal: true },
+                channelCount: { ideal: 1 }
+            };
+            const id = String(store.audioInputDeviceId || '').trim();
+            if (id) audio.deviceId = { exact: id };
+            return { audio };
+        }
+
+        async function refreshMicInputList() {
+            const sel = document.getElementById('micSelect');
+            if (!sel) return;
+            const prev = String(store.audioInputDeviceId || '').trim();
+            try {
+                await navigator.mediaDevices.getUserMedia(buildAudioInputConstraints());
+            } catch (err) {
+                if (prev) {
+                    store.audioInputDeviceId = '';
+                    persistStore();
+                    try {
+                        await navigator.mediaDevices.getUserMedia({ audio: true });
+                    } catch (e2) {
+                        showStatus('Mic error: ' + err.message, '#dc322f');
+                        return;
+                    }
+                } else {
+                    showStatus('Mic error: ' + err.message, '#dc322f');
+                    return;
+                }
+            }
+            const list = await navigator.mediaDevices.enumerateDevices();
+            const inputs = list.filter(function (d) { return d.kind === 'audioinput'; });
+            sel.innerHTML = '<option value="">System default input</option>';
+            for (let i = 0; i < inputs.length; i++) {
+                const d = inputs[i];
+                const o = document.createElement('option');
+                o.value = d.deviceId;
+                o.textContent = d.label || ('Microphone ' + (i + 1));
+                sel.appendChild(o);
+            }
+            const want = String(store.audioInputDeviceId || '').trim();
+            sel.value = want;
+            if (want && sel.value !== want) {
+                sel.value = '';
+                store.audioInputDeviceId = '';
+                persistStore();
+                showStatus('Saved mic not found — pick it again after Refresh.', 'rgba(181,137,0,0.25)');
+            }
+        }
+
+        function onMicSelectChange() {
+            const sel = document.getElementById('micSelect');
+            if (!sel) return;
+            store.audioInputDeviceId = (sel.value || '').trim();
+            persistStore();
+            showStatus('Microphone saved. Stop and re‑Engage Whisper if it was already running.', 'rgba(133, 153, 0, 0.25)');
+        }
+
+        async function parseFile(inputId, contextKey) {
+            const el = document.getElementById(inputId);
+            const statusEl = document.getElementById(inputId === 'resumeFile' ? 'resumeStatus' : 'jdStatus');
+            if (el.files.length === 0) return;
+            statusEl.innerText = "Extracting..."; statusEl.className = "warning";
+            try {
+                const file = el.files[0];
+                const buffer = await file.arrayBuffer();
+                const result = await ipcRenderer.invoke('parse-file', { buffer: new Uint8Array(buffer), name: file.name });
+                if (result.error) throw new Error(result.error);
+                store[contextKey] = result.text;
+                persistStore();
+                statusEl.innerText = "Secured! (" + Math.round(result.text.length/1000) + " kb)";
+                statusEl.className = "success";
+            } catch (err) { statusEl.innerText = "Error: " + err.message; statusEl.className = "error"; }
+        }
+
+        async function fetchJdUrl() {
+            const url = document.getElementById('jdUrl').value.trim();
+            const statusEl = document.getElementById('jdStatus');
+            if (!url) return;
+            statusEl.innerText = "Infiltrating URL..."; statusEl.className = "warning";
+            try {
+                let validUrl = url.startsWith('http') ? url : 'https://' + url;
+                const result = await ipcRenderer.invoke('scrape-url', validUrl);
+                if (result.error) throw new Error(result.error);
+                store['jdContext'] = result.text;
+                persistStore();
+                statusEl.innerText = "URL Secured! (" + Math.round(result.text.length/1000) + " kb)";
+                statusEl.className = "success";
+            } catch (err) { statusEl.innerText = "Error: " + err.message; statusEl.className = "error"; }
+        }
+
+        function updateDomainViewer() {
+            const v = document.getElementById('domainViewer');
+            const s = document.getElementById('domainStatus');
+            if (!store.domainContext) {
+                v.value = "Memory is currently empty. Provide blueprints above.";
+                s.innerText = "Memory Clean.";
+            } else {
+                v.value = store.domainContext.substring(0, 500) + "...\n\n[Total Weight: " + Math.round(store.domainContext.length/1000) + " kb]";
+                s.innerText = "Intel Active (" + Math.round(store.domainContext.length/1000) + " kb)";
+            }
+        }
+
+        async function parseDomainFiles() {
+            const el = document.getElementById('domainFiles');
+            const statusEl = document.getElementById('domainStatus');
+            if (el.files.length === 0) return;
+            statusEl.innerText = "Processing batch... Please wait."; statusEl.className = "warning";
+            try {
+                let accumulated = "";
+                for (let i = 0; i < el.files.length; i++) {
+                    const file = el.files[i];
+                    const buffer = await file.arrayBuffer();
+                    const result = await ipcRenderer.invoke('parse-file', { buffer: new Uint8Array(buffer), name: file.name });
+                    if (result.error) throw new Error("File " + file.name + " failed: " + result.error);
+                    accumulated += "\n\n--- DOCUMENT: " + file.name + " ---\n" + result.text;
+                }
+                if (!store.domainContext) store.domainContext = "";
+                store.domainContext += accumulated;
+                persistStore(); updateDomainViewer(); el.value = ""; 
+            } catch (err) { statusEl.innerText = "Error: " + err.message; statusEl.className = "error"; }
+        }
+
+        async function appendDomainUrl() {
+            const url = document.getElementById('domainUrl').value.trim();
+            const statusEl = document.getElementById('domainStatus');
+            if (!url) return;
+            statusEl.innerText = "Scraping Server..."; statusEl.className = "warning";
+            try {
+                let validUrl = url.startsWith('http') ? url : 'https://' + url;
+                const result = await ipcRenderer.invoke('scrape-url', validUrl);
+                if (result.error) throw new Error(result.error);
+                if (!store.domainContext) store.domainContext = "";
+                store.domainContext += "\n\n--- SOURCE: " + validUrl + " ---\n" + result.text;
+                persistStore(); updateDomainViewer(); document.getElementById('domainUrl').value = ""; 
+            } catch (err) { statusEl.innerText = "Error: " + err.message; statusEl.className = "error"; }
+        }
+
+        function clearDomainKnowledge() {
+            if(confirm("Are you sure you want to wipe the Deep-Dive Intel memory bank?")) {
+                store.domainContext = ""; persistStore(); updateDomainViewer();
+            }
+        }
+
+        function showStatus(msg, color) {
+            const s = document.getElementById('status');
+            s.style.display = 'block'; 
+            s.style.background = color; 
+            if(color.includes('rgba')) { s.style.border = "1px solid " + color.replace('0.2','0.5'); s.style.color = "#586e75"; }
+            else { s.style.color = "white"; s.style.border = "none"; }
+            s.innerHTML = msg;
+        }
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function formatProseWithInlineCode(raw) {
+            const chunks = String(raw || '').split(/`([^`]+)`/);
+            let out = '';
+            for (let i = 0; i < chunks.length; i++) {
+                if (i % 2 === 0) out += escapeHtml(chunks[i]).replace(/\n/g, '<br/>');
+                else out += '<code class="mi5-inline-code">' + escapeHtml(chunks[i]) + '</code>';
+            }
+            return out;
+        }
+
+        /** Turns model markdown (```lang fences) into safe overlay HTML; prose escaped, code copy-ready. */
+        function formatInterviewAnswerHtml(raw) {
+            const text = String(raw || '');
+            const segments = [];
+            const fenceRe = /```([^\n`]*)\r?\n([\s\S]*?)```/g;
+            let last = 0, m;
+            while ((m = fenceRe.exec(text)) !== null) {
+                if (m.index > last) segments.push({ type: 'prose', body: text.slice(last, m.index) });
+                let lang = (m[1] || '').trim().toLowerCase();
+                if (!lang) lang = 'text';
+                segments.push({ type: 'code', lang, body: m[2].replace(/\r\n/g, '\n').replace(/\r/g, '\n') });
+                last = m.index + m[0].length;
+            }
+            if (last < text.length) segments.push({ type: 'prose', body: text.slice(last) });
+
+            return segments.map(seg => {
+                if (seg.type === 'prose') {
+                    return '<div class="mi5-prose" style="color:#586e75;">' + formatProseWithInlineCode(seg.body) + '</div>';
+                }
+                const langAttr = escapeHtml(seg.lang);
+                return '<pre class="mi5-code-block" data-mi5-lang="' + langAttr + '" title="Click to select all for copy"><code>' + escapeHtml(seg.body) + '</code></pre>';
+            }).join('');
+        }
+
+        function wrapOverlayAnswer(htmlBody) {
+            return '<div class="mi5-answer-root">' + htmlBody + '</div>';
+        }
+
+        function hudFull(html) { ipcRenderer.send('update-overlay-text', html); }
+        function hudStatus(html) { ipcRenderer.send('update-overlay-status', html); }
+        async function queryLLM(prompt) {
+            let domainInjection = store.domainContext ? `\n=== DOMAIN & TECHNICAL MEMORY ===\n${store.domainContext.substring(0, 15000)}` : "";
+            const systemPrompt = `You are MI5.ai, covert interview support. Ground every answer in the Agent Resume, JD, and Domain Memory below. Prefer domain terminology the hiring panel expects.
+
+Interview output contract (follow strictly):
+- No filler: never start with "Sure", "Great question", or meta commentary.
+- First line = direct answer (headline).
+- Next = at most 2 ultra-short bullets OR one tight clause pairing tradeoff vs fix.
+- Target ~75–140 spoken words (~45–75 seconds aloud) for prose-only answers. If the question asks for code, a full solution, or implementation, prioritize correct fenced code (see below) and keep surrounding prose minimal.
+- Technical: mechanism → caveat → concrete hook (API, STL type, simulator construct, Python dunder/async rule) matching the stack in the question.
+- Behavioral STAR: Situation/Task one line combined, Action max two lines, Result one measurable line — one vivid detail, zero ramble.
+- If the prompt is fragmented (Whisper artifact), infer the intended interview question once, answer that, optionally note ambiguity in half a clause.
+
+CODE & SNIPPETS (live interview — copy-ready):
+- Any substantive code, pseudocode meant to compile, shell, CMake, JSON/YAML, SystemVerilog/VHDL, SystemC, Python, SQL, etc. MUST appear inside a standard markdown fenced block only.
+- Opening fence format: three backticks, then a single-line language identifier from this set when applicable: cpp, c, python, bash, cmake, json, yaml, sql, systemverilog, verilog, vhdl, systemc, typescript, javascript, rust, go, java, kotlin, text (plain only when no lexer fits). No space before newline after the tag.
+- Body: valid syntax for that language, correct indentation, semicolons/braces as required, real identifiers; no line-number prefixes inside the fence.
+- Use separate fences for unrelated snippets. For one-liners or symbols, you may use single backticks inline in prose.
+- Never substitute HTML entities for code characters; output raw source characters inside fences.
+
+=== AGENT RESUME ===
+${store.resumeContext}
+
+=== MISSION DESCRIPTION (JD) ===
+${store.jdContext}
+${domainInjection}`;
+            
+            const key = store.apiKey;
+            if (!key) throw new Error("API Key disconnected!");
+            
+            const url = 'https://api.groq.com/openai/v1/chat/completions';
+            const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` };
+            const body = JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: prompt } ],
+                max_tokens: 720,
+                temperature: 0.35
+            });
+
+            const response = await fetch(url, { method: 'POST', headers, body });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+            return data.choices[0].message.content;
+        }
+
+        async function queryLLMVision(dataUrl) {
+            let domainInjection = store.domainContext ? `\n=== DOMAIN & TECHNICAL MEMORY ===\n${store.domainContext.substring(0, 15000)}` : "";
+            const systemPrompt = `You are MI5.ai covert interview support analyzing a screenshot of the hostile screen.
+
+1. Extract the single core interview question or coding prompt.
+2. Answer with: headline sentence, then at most 2 short bullets (or one tradeoff line) unless the screen asks for code — then lead with minimal prose and deliver the solution as standard markdown fenced blocks (see CODE rules below). ~75–140 words of prose when not coding.
+3. Tie to resume/JD/domain when relevant; use stack-specific terms.
+4. If there is no question, summarize the technical content in 3 crisp bullets.
+
+CODE (screenshot / live pad): Any code you produce MUST use markdown fences with a correct language tag on the opening line (cpp, python, systemverilog, bash, cmake, json, systemc, etc. — same rules as chat). Body must be editor-ready: valid syntax, indentation, no line numbers inside the fence. Multiple snippets => multiple fences.
+
+=== AGENT RESUME ===
+${store.resumeContext}
+
+=== MISSION DESCRIPTION ===
+${store.jdContext}
+${domainInjection}`;
+
+            const key = store.apiKey;
+            if (!key) throw new Error("API Key disconnected!");
+            
+            const url = 'https://api.groq.com/openai/v1/chat/completions';
+            const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` };
+            const body = JSON.stringify({
+                model: 'llama-3.2-90b-vision-preview',
+                messages: [ 
+                    { role: 'user', content: [
+                        { type: "text", text: systemPrompt },
+                        { type: "image_url", image_url: { url: dataUrl } }
+                    ] }
+                ],
+                max_tokens: 720,
+                temperature: 0.35
+            });
+
+            const response = await fetch(url, { method: 'POST', headers, body });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+            return data.choices[0].message.content;
+        }
+
+        ipcRenderer.on('process-screenshot', async (event, dataUrl) => {
+            showStatus('🚀 Deep Vision scanning...', 'rgba(211, 54, 130, 0.2)');
+            hudStatus('<em style="color:#d33682;">MI5.ai vision scanning hostile screen…</em>');
+            try {
+                const answer = await queryLLMVision(dataUrl);
+                hudFull('<strong style="color:#2aa198;">📸 INTELLIGENCE ACQUIRED:</strong><br/><br/>' + wrapOverlayAnswer(formatInterviewAnswerHtml(answer)));
+                showStatus('✅ Screen neutralized via Vision Engine.', 'rgba(133, 153, 0, 0.2)');
+            } catch (err) {
+                 showStatus('❌ Error: ' + err.message, '#dc322f');
+                 hudStatus('<span style="color:#dc322f">Error: ' + escapeHtml(err.message) + '</span>');
+            }
+        });
+
+        // Whisper STT — tuned to reduce silence/noise hallucinations (wrong "YouTube" style text)
+        const WHISPER_CHUNK_MS = 10000;
+        const WHISPER_MIN_BLOB_BYTES = 4800;
+        const WHISPER_BUFFER_MAX_CHARS = 1800;
+        let whisperTranscriptTail = '';
+        let whisperChunksOverMin = 0;
+        let whisperLinesAccepted = 0;
+
+        function buildWhisperPrompt() {
+            const base = 'Technical software engineering job interview. Interviewer asks about programming: C++ copy constructor move semantics RAII STL algorithms Python async. ';
+            const jd = (store.jdContext || '').replace(/\s+/g, ' ').trim().slice(0, 220);
+            const dom = (store.domainContext || '').replace(/\s+/g, ' ').trim().slice(0, 220);
+            let p = base + jd + ' ' + dom;
+            if (whisperTranscriptTail) p += ' Continuation after: ' + whisperTranscriptTail;
+            return p.trim().slice(0, 750);
+        }
+
+        const WHISPER_HALLUCINATION_SUBSTR = [
+            'subscribe', 'thank you for watching', 'thanks for watching', 'see you in the next',
+            'like and comment', 'like and subscribe', 'transcribed by', 'amara.org', 'importance of currency',
+            'concept of the universe', 'can you see my face', 'music playing', 'applause', 'subtitle',
+            'closed captioning', 'copyright', 'all rights reserved'
+        ];
+
+        function isLikelyWhisperHallucination(text) {
+            const t = (text || '').toLowerCase();
+            if (!t.trim()) return true;
+            for (let i = 0; i < WHISPER_HALLUCINATION_SUBSTR.length; i++) {
+                if (t.includes(WHISPER_HALLUCINATION_SUBSTR[i])) return true;
+            }
+            if (/^\s*(hi|hello|hey)\b[^.]{0,80}\bhow are you\b/i.test(t) && t.length < 120 && !/(copy|constructor|class|template|pointer|virtual|override)/i.test(t)) return true;
+            return false;
+        }
+
+        function extractWhisperTextFromApiPayload(data) {
+            if (!data || data.error) return '';
+            if (data.segments && Array.isArray(data.segments) && data.segments.length) {
+                const parts = [];
+                for (let i = 0; i < data.segments.length; i++) {
+                    const seg = data.segments[i];
+                    const raw = (seg.text || '').trim();
+                    if (!raw) continue;
+                    const ns = typeof seg.no_speech_prob === 'number' ? seg.no_speech_prob : 0;
+                    const lp = typeof seg.avg_logprob === 'number' ? seg.avg_logprob : 0;
+                    const cr = typeof seg.compression_ratio === 'number' ? seg.compression_ratio : 1;
+                    if (ns > 0.48) continue;
+                    if (lp < -0.92) continue;
+                    if (cr > 2.55 || cr < 0.32) continue;
+                    if (isLikelyWhisperHallucination(raw)) continue;
+                    parts.push(raw);
+                }
+                return parts.join(' ').replace(/\s+/g, ' ').trim();
+            }
+            const plain = (data.text || '').trim();
+            if (isLikelyWhisperHallucination(plain)) return '';
+            return plain;
+        }
+
+        async function transcribeWhisperChunk(blob, apiKey) {
+            const file = new File([blob], 'chunk.webm', { type: blob.type || 'audio/webm' });
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('model', 'whisper-large-v3');
+            formData.append('language', 'en');
+            formData.append('temperature', '0');
+            formData.append('prompt', buildWhisperPrompt());
+            formData.append('response_format', 'verbose_json');
+            formData.append('timestamp_granularities[]', 'segment');
+
+            const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + apiKey },
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                const errMsg = (data && data.error && data.error.message) ? data.error.message : JSON.stringify(data);
+                throw new Error(errMsg);
+            }
+            return extractWhisperTextFromApiPayload(data);
+        }
+
+        async function transcribeWhisperChunkPlainJson(blob, apiKey) {
+            const file = new File([blob], 'chunk.webm', { type: blob.type || 'audio/webm' });
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('model', 'whisper-large-v3');
+            formData.append('language', 'en');
+            formData.append('temperature', '0');
+            formData.append('prompt', buildWhisperPrompt());
+            formData.append('response_format', 'json');
+
+            const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + apiKey },
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error((data && data.error && data.error.message) || JSON.stringify(data));
+            const t = (data.text || '').trim();
+            return isLikelyWhisperHallucination(t) ? '' : t;
+        }
+
+        // Whisper STT Accumulator (state)
+        let audioStream = null;
+        let isRecording = false;
+        let accumulatedSpeechBuffer = "";
+
+        async function startSpeechMonitor() {
+            try {
+                whisperChunksOverMin = 0;
+                whisperLinesAccepted = 0;
+                audioStream = await navigator.mediaDevices.getUserMedia(buildAudioInputConstraints());
+                document.getElementById('speechStatus').innerText = "Tracking Audio...(Wait for Ctrl+Shift+A)";
+                document.getElementById('speechStatus').style.color = "var(--accent-red)";
+                accumulatedSpeechBuffer = "";
+                whisperTranscriptTail = "";
+                hudStatus('<span style="color:#dc322f;">Audio tap active — speak or capture interviewer audio. Status + live transcript appear here; answers stay below until ready.</span>');
+                isRecording = true;
+                runWhisperLoop();
+            } catch (err) { showStatus("Audio Error: " + err.message, "#dc322f"); }
+        }
+
+        function pickRecorderMimeType() {
+            const c = 'audio/webm;codecs=opus';
+            if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) return c;
+            return 'audio/webm';
+        }
+
+        function runWhisperLoop() {
+            if (!isRecording || !audioStream) return;
+            const mimeType = pickRecorderMimeType();
+            let recorder;
+            try {
+                recorder = new MediaRecorder(audioStream, { mimeType });
+            } catch (e) {
+                recorder = new MediaRecorder(audioStream);
+            }
+            const chunks = [];
+            recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+            recorder.onstop = async () => {
+                if (!isRecording) return;
+                const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
+
+                if (blob.size >= WHISPER_MIN_BLOB_BYTES) {
+                    whisperChunksOverMin++;
+                    runWhisperLoop();
+
+                    try {
+                        let text = '';
+                        try {
+                            text = await transcribeWhisperChunk(blob, store.apiKey);
+                        } catch (verboseErr) {
+                            console.warn('Whisper verbose_json failed, retrying json:', verboseErr.message);
+                            text = await transcribeWhisperChunkPlainJson(blob, store.apiKey);
+                        }
+                        const trimmed = (text || '').trim();
+                        const alphaNumLen = trimmed.replace(/[^a-zA-Z0-9]/g, '').length;
+                        if (alphaNumLen >= 6 && trimmed.length >= 3) {
+                            whisperLinesAccepted++;
+                            accumulatedSpeechBuffer = (accumulatedSpeechBuffer + ' ' + trimmed).trim();
+                            if (accumulatedSpeechBuffer.length > WHISPER_BUFFER_MAX_CHARS) {
+                                accumulatedSpeechBuffer = accumulatedSpeechBuffer.slice(-WHISPER_BUFFER_MAX_CHARS);
+                            }
+                            whisperTranscriptTail = accumulatedSpeechBuffer.slice(-280);
+                            hudStatus('<strong style="color:#268bd2;">[Intel buffer]</strong> <span style="color:#657b83;">' + escapeHtml(accumulatedSpeechBuffer) + '</span>');
+                        }
+                    } catch (e) { console.error('Whisper API Error: ' + e.message); }
+                } else {
+                    runWhisperLoop();
+                }
+            };
+            try {
+                recorder.start();
+            } catch (e) {
+                console.error('MediaRecorder.start failed', e);
+                if (isRecording) setTimeout(runWhisperLoop, 500);
+                return;
+            }
+            setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, WHISPER_CHUNK_MS);
+        }
+
+        function stopSpeechMonitor() {
+            isRecording = false; accumulatedSpeechBuffer = ""; whisperTranscriptTail = "";
+            if (audioStream) { audioStream.getTracks().forEach(track => track.stop()); audioStream = null; }
+            document.getElementById('speechStatus').innerText = "Standby";
+            document.getElementById('speechStatus').style.color = "var(--text-main)";
+            hudStatus('<span style="color:#586e75;">Audio tap disconnected.</span>');
+        }
+
+        ipcRenderer.on('process-audio-answer', async () => {
+            if (!accumulatedSpeechBuffer || accumulatedSpeechBuffer.trim() === "") {
+                ipcRenderer.send('overlay-bring-to-front');
+                const tip = '<strong style="color:#dc322f;">No speech buffered yet.</strong><br/>' +
+                    '<span style="font-size:11px;color:#657b83;line-height:1.4;">Under <b>Interview microphone</b>, click <b>Refresh</b>, choose your Jabra input, <b>Stop</b> then <b>Engage Whisper</b> again. Speak toward the boom mic; wait until at least one full ' + (WHISPER_CHUNK_MS / 1000) + 's chunk has passed after the question, then <b>Ctrl+Shift+A</b>. ' +
+                    'Chunks sent to STT (≥ min size): ' + whisperChunksOverMin + '. Lines accepted into buffer: ' + whisperLinesAccepted + '.</span>';
+                hudStatus(tip);
+                return;
+            }
+            const questionToAnswer = accumulatedSpeechBuffer;
+            accumulatedSpeechBuffer = "";
+            whisperTranscriptTail = "";
+            ipcRenderer.send('stash-manual-draft', questionToAnswer);
+
+            showStatus('🚀 Decoding Hostile Audio...', 'rgba(38, 139, 210, 0.2)');
+            hudStatus('<em style="color:#268bd2;">Decrypting / answering…</em> <span style="color:#657b83;">' + escapeHtml(questionToAnswer.slice(0, 220)) + (questionToAnswer.length > 220 ? '…' : '') + '</span>');
+
+            try {
+                const answer = await queryLLM(questionToAnswer);
+                hudFull('<strong style="color:#2aa198;">🗣️ Target Q: ' + escapeHtml(questionToAnswer) + '</strong><br/><br/>' + wrapOverlayAnswer(formatInterviewAnswerHtml(answer)));
+                showStatus('✅ Audio Decrypted & Answered!', 'rgba(133, 153, 0, 0.2)');
+            } catch (err) {
+                 showStatus('❌ Error: ' + err.message, '#dc322f');
+                 hudStatus('<span style="color:#dc322f">Error: ' + escapeHtml(err.message) + '</span>');
+            }
+        });
+
+        // Manual question asked from HUD (typing/correction path)
+        ipcRenderer.on('manual-ask', async (event, rawText) => {
+            const q = String(rawText || '').trim();
+            if (!q) {
+                hudStatus('<span style="color:#dc322f">Manual question was empty.</span>');
+                return;
+            }
+            showStatus('🧠 Manual question…', 'rgba(38, 139, 210, 0.2)');
+            hudStatus('<em style="color:#268bd2;">Processing manual question…</em> <span style="color:#657b83;">' + escapeHtml(q.slice(0, 220)) + (q.length > 220 ? '…' : '') + '</span>');
+            try {
+                const answer = await queryLLM(q);
+                hudFull('<strong style="color:#2aa198;">✅ Manual answer</strong><br/><br/>' + wrapOverlayAnswer(formatInterviewAnswerHtml(answer)));
+                showStatus('✅ Manual answer ready.', 'rgba(133, 153, 0, 0.2)');
+            } catch (err) {
+                showStatus('❌ Error: ' + err.message, '#dc322f');
+                hudStatus('<span style="color:#dc322f">Error: ' + escapeHtml(err.message) + '</span>');
+            }
+        });
+
+        // Clipboard
+        let clipboardInterval = null;
+        let lastClipboardText = '';
+
+        function startListeningClipboard() {
+            if (clipboardInterval) return;
+            lastClipboardText = clipboard.readText();
+            document.getElementById('clipboardStatus').innerText = "Tracking...";
+            document.getElementById('clipboardStatus').style.color = "var(--accent-blue)";
+            hudStatus('<span style="color:#268bd2;">Clipboard tap active — awaiting Ctrl+C.</span>');
+            
+            clipboardInterval = setInterval(async () => {
+                let text = clipboard.readText();
+                if (text && text !== lastClipboardText && text.trim().length > 5) {
+                    lastClipboardText = text;
+                    hudStatus('<em style="color:#268bd2;">Decrypting clipboard…</em>');
+                    try {
+                        const answer = await queryLLM(text);
+                        hudFull('<strong style="color:#2aa198;">Q: ' + escapeHtml(text) + '</strong><br/><br/>' + wrapOverlayAnswer(formatInterviewAnswerHtml(answer)));
+                    } catch (e) { hudStatus('<span style="color:#dc322f">Error: ' + escapeHtml(e.message) + '</span>'); }
+                }
+            }, 1000);
+        }
+
+        function stopListeningClipboard() {
+            if (clipboardInterval) clearInterval(clipboardInterval);
+            clipboardInterval = null;
+            document.getElementById('clipboardStatus').innerText = "Standby";
+            document.getElementById('clipboardStatus').style.color = "var(--text-main)";
+            hudStatus('<span style="color:#586e75;">Clipboard tap disconnected.</span>');
+        }
+
+        setTimeout(function () {
+            try { refreshMicInputList(); } catch (e) {}
+        }, 800);
+    </script>
+</body>
+</html>
