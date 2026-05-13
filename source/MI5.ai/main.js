@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, desktopCapturer, Menu } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, desktopCapturer, Menu, screen, nativeImage } = require('electron');
 const path = require('path');
 
 let mainWindow;
@@ -107,7 +107,7 @@ app.whenReady().then(() => {
     try {
         const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1920, height: 1080 } });
         if (sources.length > 0) {
-            const dataUrl = sources[0].thumbnail.toDataURL();
+            const dataUrl = 'data:image/jpeg;base64,' + sources[0].thumbnail.toJPEG(80).toString('base64');
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('process-screenshot', dataUrl);
             }
@@ -127,6 +127,74 @@ app.whenReady().then(() => {
         overlayWindow.webContents.send('update-overlay-status', '<em style="color:#268bd2;">Transcribing / answering audio…</em>');
         if (!overlayWindow.isVisible()) overlayWindow.show();
     }
+  });
+
+  globalShortcut.register('CommandOrControl+Shift+Z', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('undo-clear');
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send('update-overlay-status', '<em style="color:#268bd2;">↩ Buffer restored…</em>');
+    }
+  });
+
+  // Ctrl+Shift+C — drag-to-clip region selector
+  let clipWindow = null;
+  globalShortcut.register('CommandOrControl+Shift+C', async () => {
+    try {
+      if (clipWindow && !clipWindow.isDestroyed()) { clipWindow.close(); clipWindow = null; return; }
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width, height } = primaryDisplay.bounds;
+      const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width, height } });
+      if (!sources.length) return;
+      const dataUrl = 'data:image/jpeg;base64,' + sources[0].thumbnail.toJPEG(80).toString('base64');
+
+      clipWindow = new BrowserWindow({
+        x: 0, y: 0, width, height,
+        transparent: true, frame: false, alwaysOnTop: true,
+        skipTaskbar: true, resizable: false,
+        webPreferences: { nodeIntegration: true, contextIsolation: false }
+      });
+      clipWindow.loadFile('clip-selector.html');
+      clipWindow.once('ready-to-show', () => {
+        clipWindow.setAlwaysOnTop(true, 'screen-saver');
+        clipWindow.show();
+        clipWindow.focus();
+        clipWindow.webContents.send('set-screenshot', dataUrl, width, height);
+      });
+      clipWindow.on('closed', () => { clipWindow = null; });
+    } catch(e) { console.error('Clip shortcut error:', e); }
+  });
+
+  ipcMain.on('clip-region-selected', (evt, region) => {
+    try {
+      if (clipWindow && !clipWindow.isDestroyed()) { clipWindow.close(); clipWindow = null; }
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const dispW = primaryDisplay.bounds.width;
+      const dispH = primaryDisplay.bounds.height;
+      // Use desktopCapturer again for full-res crop
+      desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: dispW, height: dispH } }).then(sources => {
+        if (!sources.length) return;
+        const img = sources[0].thumbnail;
+        const sz = img.getSize();
+        const scaleX = sz.width / dispW;
+        const scaleY = sz.height / dispH;
+        const cropped = img.crop({
+          x: Math.max(0, Math.round(region.x * scaleX)),
+          y: Math.max(0, Math.round(region.y * scaleY)),
+          width: Math.min(sz.width, Math.round(region.w * scaleX)),
+          height: Math.min(sz.height, Math.round(region.h * scaleY))
+        });
+        const croppedUrl = 'data:image/jpeg;base64,' + cropped.toJPEG(85).toString('base64');
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('process-screenshot', croppedUrl);
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.webContents.send('update-overlay-status', '<em style="color:#d33682;">🔍 Scanning clipped region…</em>');
+          if (!overlayWindow.isVisible()) overlayWindow.show();
+        }
+      });
+    } catch(e) { console.error('clip-region-selected error:', e); }
+  });
+
+  ipcMain.on('clip-cancelled', () => {
+    if (clipWindow && !clipWindow.isDestroyed()) { clipWindow.close(); clipWindow = null; }
   });
 
   app.on('activate', () => {
@@ -166,6 +234,16 @@ ipcMain.on('update-overlay-status', (event, html) => {
       overlayWindow.show();
     }
   }
+});
+
+ipcMain.on('update-buffer-state', (event, state) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('update-buffer-state', state);
+  }
+});
+
+ipcMain.on('overlay-undo-clear', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('undo-clear');
 });
 
 ipcMain.on('overlay-bring-to-front', () => {

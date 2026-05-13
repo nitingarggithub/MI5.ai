@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    cursor: crosshair;
+    background: transparent;
+  }
+  #screenshot {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: fill;
+  }
+  /* Dark scrim over the whole screen */
+  #scrim {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.42);
+    pointer-events: none;
+  }
+  /* The selection box punches through the scrim via box-shadow */
+  #sel {
+    position: absolute;
+    display: none;
+    border: 2px solid #2aa198;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.44);
+    background: rgba(42, 161, 152, 0.08);
+    pointer-events: none;
+  }
+  /* Size readout */
+  #info {
+    position: absolute;
+    background: rgba(0,0,0,0.72);
+    color: #2aa198;
+    font-family: 'Inter', monospace, sans-serif;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    display: none;
+    white-space: nowrap;
+  }
+  #hint {
+    position: absolute;
+    top: 18px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.75);
+    color: #fff;
+    padding: 9px 20px;
+    border-radius: 8px;
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 13px;
+    pointer-events: none;
+    letter-spacing: 0.2px;
+  }
+  #hint span { color: #2aa198; font-weight: 600; }
+</style>
+</head>
+<body>
+  <img id="screenshot" src="" draggable="false">
+  <div id="scrim"></div>
+  <div id="sel"></div>
+  <div id="info"></div>
+  <div id="hint">
+    <span>Drag</span> to select region to analyse &nbsp;|&nbsp; <span>ESC</span> to cancel
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const sel   = document.getElementById('sel');
+    const info  = document.getElementById('info');
+    const ssImg = document.getElementById('screenshot');
+
+    let startX = 0, startY = 0, dragging = false;
+
+    ipcRenderer.on('set-screenshot', (e, dataUrl) => {
+      ssImg.src = dataUrl;
+    });
+
+    document.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      startX = e.clientX; startY = e.clientY;
+      dragging = true;
+      sel.style.display = 'block';
+      sel.style.left   = startX + 'px';
+      sel.style.top    = startY + 'px';
+      sel.style.width  = '0px';
+      sel.style.height = '0px';
+      info.style.display = 'none';
+    });
+
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const x = Math.min(e.clientX, startX);
+      const y = Math.min(e.clientY, startY);
+      const w = Math.abs(e.clientX - startX);
+      const h = Math.abs(e.clientY - startY);
+      sel.style.left   = x + 'px';
+      sel.style.top    = y + 'px';
+      sel.style.width  = w + 'px';
+      sel.style.height = h + 'px';
+
+      // Size readout
+      info.textContent = w + ' × ' + h;
+      info.style.display = 'block';
+      info.style.left = (x + w + 6) + 'px';
+      info.style.top  = (y - 20) + 'px';
+    });
+
+    document.addEventListener('mouseup', e => {
+      if (!dragging) return;
+      dragging = false;
+      const x = Math.min(e.clientX, startX);
+      const y = Math.min(e.clientY, startY);
+      const w = Math.abs(e.clientX - startX);
+      const h = Math.abs(e.clientY - startY);
+      sel.style.display = 'none';
+      info.style.display = 'none';
+      if (w < 12 || h < 12) {
+        ipcRenderer.send('clip-cancelled');
+        return;
+      }
+      ipcRenderer.send('clip-region-selected', { x, y, w, h });
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') ipcRenderer.send('clip-cancelled');
+    });
+  </script>
+</body>
+</html>

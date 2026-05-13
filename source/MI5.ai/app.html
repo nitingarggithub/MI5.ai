@@ -131,14 +131,38 @@
         <div style="margin-bottom: 15px;">
             <label>LLM Provider</label>
             <select id="modelSelect">
-                <option value="groq">Groq (Llama 3.3 70B - Recommended)</option>
+                <option value="cerebras">⚡ Cerebras — Llama 3.3 70B — RECOMMENDED (1M tok/day FREE, ~2000 tok/s, crisp answers)</option>
+                <option value="groq">Groq — Llama 3.3 70B (same model, proven quality, ~100K tok/day free)</option>
+                <option value="gemini">Gemini 2.0 Flash — Google (1M tok/day FREE — verbose style, use for Vision clips)</option>
                 <option value="grok">Grok (xAI)</option>
                 <option value="openrouter">OpenRouter (Free Tier)</option>
             </select>
         </div>
-        <div style="margin-bottom: 25px;">
-            <label>API Key</label>
-            <input type="password" id="apiKey" placeholder="Enter API Key (e.g. gsk_...)">
+        <div style="margin-bottom: 25px; font-size:0.82em; background:rgba(42,161,152,0.08); padding:10px; border-radius:8px; line-height:1.6;">
+            <strong style="color:#2aa198;">🔑 API Key Sources (all free):</strong><br/>
+            • <strong>Cerebras</strong>: <a href="#" onclick="require('electron').shell.openExternal('https://cloud.cerebras.ai')">cloud.cerebras.ai</a> → 1M tokens/day — <em>same Llama 3.3 70B as Groq, 10× faster &amp; 10× more quota</em><br/>
+            • <strong>Groq</strong>: <a href="#" onclick="require('electron').shell.openExternal('https://console.groq.com/keys')">console.groq.com/keys</a> → ~100K tokens/day<br/>
+            • <strong>Gemini</strong>: <a href="#" onclick="require('electron').shell.openExternal('https://aistudio.google.com/apikey')">aistudio.google.com/apikey</a> → 1M tokens/day — <em>use as Vision fallback only (verbose style)</em>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Primary API Key (Cerebras / Groq / Gemini)</label>
+            <input type="password" id="apiKey" placeholder="Enter API Key (e.g. gsk_ / csk_ / AIza...)">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Groq Fallback Key <span style="font-weight:400;color:#93a1a1;">(needed when primary is Cerebras, for Vision + Specialist fallback)</span></label>
+            <input type="password" id="groqFallbackKey" placeholder="gsk_... (get free at console.groq.com/keys)">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>🔬 Specialist Mode <span style="font-weight:400;color:#93a1a1;">(auto-routes deep technical Qs to a reasoning model via Groq)</span></label>
+            <select id="specialistMode">
+                <option value="">OFF — use selected provider for everything</option>
+                <option value="deepseek-r1">🧠 DeepSeek-R1 Distill 70B — BEST for C++/SystemC/TLM/SoC (reasoning, via Groq)</option>
+                <option value="qwq-32b">⚡ QwQ-32B — Qwen reasoning model, strong on architecture &amp; Python (via Groq)</option>
+            </select>
+            <div style="font-size:0.78em; color:#b58900; margin-top:6px; line-height:1.5;">
+                💡 <strong>DeepSeek-R1</strong> is the best <em>free</em> model for SystemVerilog/TLM 2.0/SoC — it thinks step-by-step before answering (reasoning traces). Requires a Groq key above.<br/>
+                🔧 To <strong>train your own</strong>: fine-tune <code>Qwen2.5-Coder-7B</code> or <code>DeepSeek-Coder-V2-Lite-16B</code> on 1000+ SystemC/TLM Q&amp;A pairs using LoRA (HuggingFace + Unsloth). Inject trained adapter via Ollama locally.
+            </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
             <button onclick="document.getElementById('settingsModal').close()" class="btn-ghost" style="border:1px solid #ccc; color:var(--text-main);">Cancel</button>
@@ -195,8 +219,8 @@
         <p>Press <strong>Ctrl+Shift+O</strong> to toggle the MI5.ai HUD overlay.</p>
         
         <div style="background: rgba(253, 246, 227, 0.5); padding: 15px; border-radius: 8px; margin-top: 15px;">
-            <p style="color:var(--accent-red); font-size: 0.95em; margin-top:0;"><strong>🔥 Phantom OCR:</strong> Hit <strong>Ctrl+Shift+S</strong> globally to snap the hostile screen and solve silently.</p>
-            <p style="color:var(--accent-blue); font-size: 0.95em; margin-bottom:0;"><strong>🎙️ Audio Tracker:</strong> Pick your headset in <strong>Interview microphone</strong> below (Jabra, etc.), then <strong>Engage Whisper</strong>. Wait ~10s after the interviewer finishes, then <strong>Ctrl+Shift+A</strong>. For remote audio only, you still need loopback / Stereo Mix — the headset mic hears <em>you</em>, not Teams playback.</p>
+            <p style="color:var(--accent-red); font-size: 0.95em; margin-top:0;"><strong>🔥 Phantom OCR:</strong> Hit <strong>Ctrl+Shift+S</strong> to snap the full screen. Hit <strong>Ctrl+Shift+C</strong> to <em>drag-select</em> a region (question, diagram, code pad) — only that clip is sent to Vision.</p>
+            <p style="color:var(--accent-blue); font-size: 0.95em; margin-bottom:0;"><strong>🎙️ Audio Tracker:</strong> Pick your headset in <strong>Interview microphone</strong> below (Jabra, etc.), then <strong>Engage Whisper</strong>. Enable <strong>Smart Auto-Answer</strong> to auto-detect questions and skip Ctrl+Shift+A. For remote audio only, you still need loopback / Stereo Mix — the headset mic hears <em>you</em>, not Teams playback.</p>
         </div>
 
         <div style="margin-top: 14px;">
@@ -220,6 +244,59 @@
             <span id="speechStatus" style="font-size: 0.85em; font-weight:600;">Standby</span>
         </div>
 
+        <!-- Smart Whisper Controls -->
+        <div style="margin-top: 14px; background: rgba(38,139,210,0.07); border-radius: 10px; padding: 12px 15px; border: 1px solid rgba(38,139,210,0.2);">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:0.9em; color:var(--accent-blue);">
+                    <input type="checkbox" id="smartAutoAnswer" style="width:auto; margin-top:0; accent-color:var(--accent-blue);" onchange="onSmartToggle()">
+                    🤖 Smart Auto-Answer
+                </label>
+                <span style="font-size:0.82em; color:var(--text-main);"><strong>OFF = recommended</strong> — <strong>Ctrl+Shift+A</strong> waits for full question = 1 LLM call with complete context. ON fires on every detected question but may waste tokens on Whisper fragments.</span>
+            </div>
+            <div style="margin-top: 10px; display:flex; gap: 20px; flex-wrap:wrap; font-size: 0.83em; color:var(--header);">
+                <span>⏱ Chunk: <strong id="chunkLabel">20s</strong></span>
+                <span>🎙 Audio used today: <strong id="audioSecondsEl">0s</strong> <span style="color:#b58900;" id="audioWarnEl"></span></span>
+                <span>📤 Whisper calls: <strong id="whisperCallsEl">0</strong></span>
+                <span>✅ Questions auto-answered: <strong id="autoAnsweredEl">0</strong></span>
+            </div>
+            <!-- LLM Token Budget Bar -->
+            <div style="margin-top:10px;">
+                <div style="display:flex; justify-content:space-between; font-size:0.82em; color:var(--header); margin-bottom:3px;">
+                    <span>🧠 LLM tokens this session: <strong id="llmTokensEl">0 / 1,000K</strong></span>
+                    <span id="llmTokenWarn" style="color:#b58900; font-weight:600;"></span>
+                </div>
+                <div style="height:6px; border-radius:4px; background:rgba(147,161,161,0.25); overflow:hidden;">
+                    <div id="llmTokenBar" style="height:100%; width:0%; background:#2aa198; border-radius:4px; transition:width 0.4s;"></div>
+                </div>
+            </div>
+            <div style="margin-top:6px; font-size:0.78em; color:#b58900;">
+                ⚠ Groq free: ~28,800 audio-sec/day (Whisper) · ~100K LLM tok/day. <strong>Gemini 2.0 Flash / Cerebras: 1M LLM tok/day FREE</strong> — switch provider in Settings for longer sessions.
+            </div>
+        </div>
+
+        <!-- Sliding Window Buffer -->
+        <div style="margin-top: 12px; background: rgba(38,139,210,0.06); border-radius: 10px; padding: 12px 15px; border: 1px solid rgba(38,139,210,0.2);">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <strong style="font-size:0.9em; color:var(--accent-blue);">🪟 Sliding Window Buffer</strong>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button onclick="undoClear()" id="undoClearBtn" class="btn-blue" style="padding:7px 14px; font-size:0.82em; opacity:0.4;" disabled>↩ Undo Clear <kbd style="background:rgba(255,255,255,0.2);padding:1px 5px;border-radius:3px;font-size:0.9em;">Ctrl+Shift+Z</kbd></button>
+                </div>
+            </div>
+            <div style="font-size:0.8em; color:#93a1a1; margin-top:4px; line-height:1.5;">
+                Ctrl+Shift+A answers the buffer then <strong>keeps the tail</strong> (last chunk) as seed for the next question.
+                One-shot <strong>Ctrl+Shift+Z</strong> recovers the full answered buffer instantly — no menus.
+            </div>
+            <div style="margin-top:8px; display:flex; gap:16px; font-size:0.82em; color:var(--header);">
+                <span>📝 Buffer chars: <strong id="bufferCharEl">0</strong></span>
+                <span>🌿 Tail chars kept: <strong id="tailCharEl">0</strong></span>
+                <span id="undoAvailEl" style="color:#b58900;"></span>
+            </div>
+        </div>
+        <!-- Active provider badge -->
+        <div style="margin-top:10px; font-size:0.82em; color:var(--header);">
+            Active provider: <strong id="providerBadge" style="color:#2aa198;">cerebras</strong>
+            <span id="providerFallbackNote" style="color:#b58900; margin-left:6px;"></span>
+        </div>
         <div id="status"></div>
     </div>
 
@@ -238,13 +315,18 @@
         const storePath = path.join(__dirname, 'store.json');
         
         let store = {
-            model: 'groq',
+            model: 'cerebras',
             apiKey: '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',
+            groqFallbackKey: '',
+            specialistMode: '',
             resumeContext: '',
             jdContext: '',
             domainContext: '',
             audioInputDeviceId: ''
         };
+        // In-memory undo buffer — sliding window (ephemeral, session only)
+        let undoBuffer = null;        // holds { full, tail } of last Ctrl+Shift+A clear
+        const TAIL_CHARS = 320;       // chars kept as seed after clear (~2 Whisper chunks)
 
         try {
             if (fs.existsSync(storePath)) {
@@ -256,20 +338,33 @@
         } catch (e) { console.error("Config load error"); }
         if (store.audioInputDeviceId == null) store.audioInputDeviceId = '';
 
-        document.getElementById('modelSelect').value = store.model;
+        document.getElementById('modelSelect').value = store.model || 'cerebras';
         document.getElementById('apiKey').value = store.apiKey;
         if (store.resumeContext) document.getElementById('resumeStatus').innerText = "Intel Uploaded";
         if (store.jdContext) document.getElementById('jdStatus').innerText = "Intel Uploaded";
         updateDomainViewer();
+        setTimeout(() => {
+            const gfk = document.getElementById('groqFallbackKey');
+            if (gfk) gfk.value = store.groqFallbackKey || '';
+            const sm = document.getElementById('specialistMode');
+            if (sm) sm.value = store.specialistMode || '';
+            updateProviderBadge(store.model || 'cerebras');
+        }, 0);
 
         function saveConfig() {
             store.model = document.getElementById('modelSelect').value;
             store.apiKey = document.getElementById('apiKey').value;
+            const gfk = document.getElementById('groqFallbackKey');
+            if (gfk) store.groqFallbackKey = (gfk.value || '').trim();
+            const sm = document.getElementById('specialistMode');
+            if (sm) store.specialistMode = (sm.value || '').trim();
             const ms = document.getElementById('micSelect');
             if (ms) store.audioInputDeviceId = (ms.value || '').trim();
+            autoFallbackProvider = null; // reset fallback on config save
             persistStore();
             document.getElementById('settingsModal').close();
-            showStatus('✅ Engine Configuration saved successfully.', 'rgba(133, 153, 0, 0.2)');
+            updateProviderBadge(store.model || 'cerebras');
+            showStatus('✅ Engine Configuration saved. Provider: ' + (store.model || 'cerebras') + (store.specialistMode ? ' + Specialist: ' + store.specialistMode : ''), 'rgba(133, 153, 0, 0.2)');
         }
 
         function persistStore() { fs.writeFileSync(storePath, JSON.stringify(store)); }
@@ -290,40 +385,37 @@
             const sel = document.getElementById('micSelect');
             if (!sel) return;
             const prev = String(store.audioInputDeviceId || '').trim();
+            // Always try to get permission first, but don't bail on error — just enumerate what we can
             try {
-                await navigator.mediaDevices.getUserMedia(buildAudioInputConstraints());
-            } catch (err) {
-                if (prev) {
-                    store.audioInputDeviceId = '';
-                    persistStore();
-                    try {
-                        await navigator.mediaDevices.getUserMedia({ audio: true });
-                    } catch (e2) {
-                        showStatus('Mic error: ' + err.message, '#dc322f');
-                        return;
-                    }
-                } else {
-                    showStatus('Mic error: ' + err.message, '#dc322f');
-                    return;
-                }
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (permErr) {
+                showStatus('Mic permission denied — check browser/OS settings. Listing available devices anyway.', 'rgba(181,137,0,0.25)');
             }
-            const list = await navigator.mediaDevices.enumerateDevices();
-            const inputs = list.filter(function (d) { return d.kind === 'audioinput'; });
+            let devices = [];
+            try {
+                const all = await navigator.mediaDevices.enumerateDevices();
+                devices = all.filter(d => d.kind === 'audioinput');
+            } catch (e) {
+                showStatus('Could not enumerate audio devices: ' + e.message, '#dc322f');
+                return;
+            }
             sel.innerHTML = '<option value="">System default input</option>';
-            for (let i = 0; i < inputs.length; i++) {
-                const d = inputs[i];
+            for (let i = 0; i < devices.length; i++) {
+                const d = devices[i];
                 const o = document.createElement('option');
                 o.value = d.deviceId;
                 o.textContent = d.label || ('Microphone ' + (i + 1));
                 sel.appendChild(o);
             }
             const want = String(store.audioInputDeviceId || '').trim();
-            sel.value = want;
-            if (want && sel.value !== want) {
-                sel.value = '';
-                store.audioInputDeviceId = '';
-                persistStore();
-                showStatus('Saved mic not found — pick it again after Refresh.', 'rgba(181,137,0,0.25)');
+            if (want) {
+                sel.value = want;
+                if (sel.value !== want) {
+                    sel.value = '';
+                    store.audioInputDeviceId = '';
+                    persistStore();
+                    showStatus('Saved mic not found — pick it again after Refresh.', 'rgba(181,137,0,0.25)');
+                }
             }
         }
 
@@ -476,27 +568,208 @@
             return '<div class="mi5-answer-root">' + htmlBody + '</div>';
         }
 
+        let _hudStatusTimer = null;
         function hudFull(html) { ipcRenderer.send('update-overlay-text', html); }
-        function hudStatus(html) { ipcRenderer.send('update-overlay-status', html); }
-        async function queryLLM(prompt) {
+        function hudStatus(html) {
+            ipcRenderer.send('update-overlay-status', html);
+            if (_hudStatusTimer) clearTimeout(_hudStatusTimer);
+            if (html) _hudStatusTimer = setTimeout(() => ipcRenderer.send('update-overlay-status', ''), 30000);
+        }
+
+        // ── Token Budget Tracker ──────────────────────────────────────────
+        let sessionLLMTokens = 0;
+        const TOKEN_WARN  = 80000;   // show warning
+        const TOKEN_THROT = 90000;   // cut max_tokens to save quota
+        const TOKEN_DAILY = 1000000; // Gemini/Cerebras; use 100000 for Groq
+
+        function tokenBudgetForProvider(model) {
+            if (model === 'gemini' || model === 'cerebras') return 1000000;
+            return 100000; // groq, grok, openrouter conservative
+        }
+
+        function trackTokens(usage) {
+            if (!usage) return;
+            const used = usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0);
+            sessionLLMTokens += used;
+            updateTokenUI();
+        }
+
+        function updateTokenUI() {
+            const el = document.getElementById('llmTokensEl');
+            const bar = document.getElementById('llmTokenBar');
+            const warn = document.getElementById('llmTokenWarn');
+            const daily = tokenBudgetForProvider(store.model || 'groq');
+            const pct = Math.min(100, Math.round(sessionLLMTokens / daily * 100));
+            if (el) el.textContent = sessionLLMTokens.toLocaleString() + ' / ' + (daily / 1000) + 'K';
+            if (bar) { bar.style.width = pct + '%'; bar.style.background = pct > 90 ? '#dc322f' : pct > 70 ? '#b58900' : '#2aa198'; }
+            if (warn) warn.textContent = sessionLLMTokens > TOKEN_THROT ? '🔴 Throttling to short answers' : sessionLLMTokens > TOKEN_WARN ? '🟡 >80% used — watch out' : '';
+        }
+
+        function dynamicMaxTokens() {
+            if (sessionLLMTokens > TOKEN_THROT) return 220;  // terse mode
+            if (sessionLLMTokens > TOKEN_WARN)  return 480;  // reduced
+            return 720;                                       // normal
+        }
+
+        // ── Provider config map ───────────────────────────────────────────
+        const PROVIDER_CONFIG = {
+            gemini:      { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+                           model: 'gemini-2.0-flash',           authHeader: key => 'Bearer ' + key },
+            cerebras:    { url: 'https://api.cerebras.ai/v1/chat/completions',
+                           model: 'llama-3.3-70b',              authHeader: key => 'Bearer ' + key },
+            groq:        { url: 'https://api.groq.com/openai/v1/chat/completions',
+                           model: 'llama-3.3-70b-versatile',    authHeader: key => 'Bearer ' + key },
+            grok:        { url: 'https://api.x.ai/v1/chat/completions',
+                           model: 'grok-3-mini',                authHeader: key => 'Bearer ' + key },
+            openrouter:  { url: 'https://openrouter.ai/api/v1/chat/completions',
+                           model: 'meta-llama/llama-4-scout:free', authHeader: key => 'Bearer ' + key }
+        };
+
+        const PROVIDER_VISION_CONFIG = {
+            gemini:  { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+                       model: 'gemini-2.0-flash',         vision: 'openai-compat' },
+            groq:    { url: 'https://api.groq.com/openai/v1/chat/completions',
+                       model: 'meta-llama/llama-4-scout-17b-16e-instruct', vision: 'openai-compat' },
+            cerebras:{ url: 'https://api.groq.com/openai/v1/chat/completions',
+                       model: 'meta-llama/llama-4-scout-17b-16e-instruct', vision: 'openai-compat', useGroqKey: true }
+        };
+
+        // ── Specialist model config (Groq-hosted reasoning models) ───────
+        const SPECIALIST_CONFIG = {
+            'deepseek-r1': { url: 'https://api.groq.com/openai/v1/chat/completions',
+                             model: 'deepseek-r1-distill-llama-70b' },
+            'qwq-32b':     { url: 'https://api.groq.com/openai/v1/chat/completions',
+                             model: 'qwq-32b' }
+        };
+
+        // Technical specialist trigger — fire when prompt contains deep domain keywords
+        const SPECIALIST_KEYWORDS = /\b(systemc|tlm.?2|tlm2|sc_module|sc_port|sc_channel|b_transport|nb_transport|initiator_socket|target_socket|payload|sysc|rtl|fpga|synthesis|flip.?flop|setup time|hold time|clock domain|cdc|metastab|pipelining|branch prediction|out.?of.?order|cache coherenc|mesi|moesi|numa|tlb|virtual memory|page table|memory model|relaxed|acquire|release|fence|atomic|move semantic|rvalue|perfect forward|sfinae|concepts|coroutine|co_await|co_yield|ranges|structured bind|constexpr|template meta|variadic|fold express|copy elision|nrvo|vtable|vptr|diamond inherit|crtp|policy.?based|allocator|pmr|jemalloc|tcmalloc|dma|interrupt|rtos|preempt|context switch|scheduler|lock.?free|wait.?free|cas|compare.?and.?swap|memory order|happens.?before|data race|race condition|deadlock|livelock|priority inversion|banker|peterson|lamport|vector clock|happened.?before|soc|noc|amba|axi|apb|ahb|chi|ace|tilelink|risc.?v|arm cortex|cache line|prefetch|branch target|spectre|meltdown|side channel|microarchitecture|out of order|superscalar|vliw|simd|avx|neon|sve|tensor core|systolic|hbm|gddr|bandwidth|latency|throughput|occupancy|warp|wavefront|cuda|opencl|sycl|hip|pcie|nvlink|infiniband|rdma|mpi|openmp|pragma omp|gil|asyncio|uvloop|trio|grpc|protobuf|flatbuffer|cap theorem|eventual consistency|paxos|raft|zab|2pc|saga|cqrs|event sourcing)/i;
+
+        function shouldUseSpecialist(prompt) {
+            return !!(store.specialistMode && SPECIALIST_CONFIG[store.specialistMode] && SPECIALIST_KEYWORDS.test(prompt));
+        }
+
+        // ── Dynamic Provider Fallback Chain ──────────────────────────────
+        const FALLBACK_CHAIN = ['cerebras', 'groq', 'gemini'];
+        let autoFallbackProvider = null; // tracks auto-switched provider this session
+
+        function isQuotaError(err) {
+            const m = (err.message || '').toLowerCase();
+            return m.includes('rate_limit') || m.includes('rate limit') || m.includes('quota') ||
+                   m.includes('exceeded') || m.includes('429') || m.includes('per day') ||
+                   m.includes('tokens per minute') || m.includes('requests per day') ||
+                   m.includes('context_length_exceeded') || m.includes('overloaded');
+        }
+
+        function updateProviderBadge(provider, note) {
+            const badge = document.getElementById('providerBadge');
+            const noteEl = document.getElementById('providerFallbackNote');
+            if (badge) {
+                badge.textContent = provider;
+                badge.style.color = provider === 'cerebras' ? '#2aa198' : provider === 'groq' ? '#268bd2' : '#d33682';
+            }
+            if (noteEl) noteEl.textContent = note || '';
+        }
+
+        async function queryLLMWithFallback(prompt) {
+            // Specialist model path: bypass fallback chain for domain-specific Qs
+            if (shouldUseSpecialist(prompt)) {
+                const specCfg = SPECIALIST_CONFIG[store.specialistMode];
+                const specKey = store.groqFallbackKey || store.apiKey;
+                try {
+                    const result = await queryLLMDirect(prompt, 'groq', specCfg.model, specKey);
+                    updateProviderBadge('groq', '🔬 Specialist: ' + store.specialistMode);
+                    return result;
+                } catch(specErr) {
+                    console.warn('Specialist model failed, falling back to primary:', specErr.message);
+                }
+            }
+
+            // Normal path with fallback chain
+            const primary = autoFallbackProvider || store.model || 'cerebras';
+            const chain = [primary, ...FALLBACK_CHAIN.filter(p => p !== primary)];
+            let lastErr;
+            for (const provider of chain) {
+                try {
+                    const result = await queryLLMDirect(prompt, provider);
+                    if (provider !== (store.model || 'cerebras') || autoFallbackProvider) {
+                        if (!autoFallbackProvider || autoFallbackProvider !== provider) {
+                            autoFallbackProvider = provider;
+                            const note = '⚡ Auto-switched from ' + (store.model || 'cerebras');
+                            showStatus('⚡ Provider auto-switched to <strong>' + provider + '</strong> — primary quota exhausted', 'rgba(181,137,0,0.2)');
+                            hudStatus('<span style="color:#b58900;">⚡ Provider switched to <strong>' + provider + '</strong> (primary quota exhausted)</span>');
+                            updateProviderBadge(provider, note);
+                        }
+                    } else {
+                        updateProviderBadge(provider);
+                    }
+                    return result;
+                } catch(err) {
+                    if (isQuotaError(err)) { lastErr = err; continue; }
+                    throw err;
+                }
+            }
+            throw lastErr || new Error('All providers quota exhausted — add more API keys in Settings');
+        }
+
+        // ── Sliding Window Buffer Functions ─────────────────────────────
+        function updateBufferUI() {
+            const bc = document.getElementById('bufferCharEl');
+            const tc = document.getElementById('tailCharEl');
+            const ua = document.getElementById('undoAvailEl');
+            const btn = document.getElementById('undoClearBtn');
+            if (bc) bc.textContent = accumulatedSpeechBuffer.length;
+            if (tc) tc.textContent = undoBuffer ? undoBuffer.tail.length : 0;
+            if (ua) ua.textContent = undoBuffer ? '⏮ Previous Q available' : '';
+            if (btn) { btn.disabled = !undoBuffer; btn.style.opacity = undoBuffer ? '1' : '0.4'; }
+            // Sync to HUD overlay
+            ipcRenderer.send('update-buffer-state', {
+                chars: accumulatedSpeechBuffer.length,
+                hasUndo: !!undoBuffer,
+                preview: accumulatedSpeechBuffer.slice(-80)
+            });
+        }
+
+        function slidingWindowClear() {
+            // Keep last TAIL_CHARS as seed for next question
+            const tail = accumulatedSpeechBuffer.slice(-TAIL_CHARS);
+            undoBuffer = { full: accumulatedSpeechBuffer, tail };
+            accumulatedSpeechBuffer = tail;
+            whisperTranscriptTail = tail.slice(-280);
+            updateBufferUI();
+        }
+
+        function undoClear() {
+            if (!undoBuffer) return;
+            accumulatedSpeechBuffer = undoBuffer.full;
+            whisperTranscriptTail = undoBuffer.full.slice(-280);
+            undoBuffer = null;
+            updateBufferUI();
+            hudStatus('<strong style="color:#268bd2;">↩ Buffer restored:</strong> <span style="color:#657b83;">' + escapeHtml(accumulatedSpeechBuffer.slice(0, 220)) + (accumulatedSpeechBuffer.length > 220 ? '…' : '') + '</span>');
+            showStatus('↩ Buffer restored — Ctrl+Shift+A to re-answer or continue.', 'rgba(38,139,210,0.15)');
+        }
+
+        // queryLLMDirect: low-level call with optional overrides
+        async function queryLLMDirect(prompt, providerOverride, modelOverride, keyOverride) {
             let domainInjection = store.domainContext ? `\n=== DOMAIN & TECHNICAL MEMORY ===\n${store.domainContext.substring(0, 15000)}` : "";
-            const systemPrompt = `You are MI5.ai, covert interview support. Ground every answer in the Agent Resume, JD, and Domain Memory below. Prefer domain terminology the hiring panel expects.
+            const isSpecialist = !!(modelOverride); // specialist mode gets extra reasoning instruction
+            const systemPrompt = `You are MI5.ai, covert interview support. Ground every answer in the Agent Resume, JD, and Domain Memory below. Prefer domain terminology the hiring panel expects.${isSpecialist ? '\n\nSPECIALIST MODE: This is a deep technical question. Think through the mechanism step by step before answering, then present only the crisp conclusion. Do NOT show reasoning steps in the final answer.' : ''}
 
 Interview output contract (follow strictly):
 - No filler: never start with "Sure", "Great question", or meta commentary.
 - First line = direct answer (headline).
 - Next = at most 2 ultra-short bullets OR one tight clause pairing tradeoff vs fix.
 - Target ~75–140 spoken words (~45–75 seconds aloud) for prose-only answers. If the question asks for code, a full solution, or implementation, prioritize correct fenced code (see below) and keep surrounding prose minimal.
-- Technical: mechanism → caveat → concrete hook (API, STL type, simulator construct, Python dunder/async rule) matching the stack in the question.
+- Technical: mechanism → caveat → concrete hook (API, STL type, simulator construct, Python dunder/async rule, TLM phase, SystemC sc_module pattern) matching the stack in the question.
 - Behavioral STAR: Situation/Task one line combined, Action max two lines, Result one measurable line — one vivid detail, zero ramble.
 - If the prompt is fragmented (Whisper artifact), infer the intended interview question once, answer that, optionally note ambiguity in half a clause.
 
 CODE & SNIPPETS (live interview — copy-ready):
 - Any substantive code, pseudocode meant to compile, shell, CMake, JSON/YAML, SystemVerilog/VHDL, SystemC, Python, SQL, etc. MUST appear inside a standard markdown fenced block only.
-- Opening fence format: three backticks, then a single-line language identifier from this set when applicable: cpp, c, python, bash, cmake, json, yaml, sql, systemverilog, verilog, vhdl, systemc, typescript, javascript, rust, go, java, kotlin, text (plain only when no lexer fits). No space before newline after the tag.
-- Body: valid syntax for that language, correct indentation, semicolons/braces as required, real identifiers; no line-number prefixes inside the fence.
-- Use separate fences for unrelated snippets. For one-liners or symbols, you may use single backticks inline in prose.
-- Never substitute HTML entities for code characters; output raw source characters inside fences.
+- Opening fence format: three backticks, then a single-line language identifier from this set when applicable: cpp, c, python, bash, cmake, json, yaml, sql, systemverilog, verilog, vhdl, systemc, typescript, javascript, rust, go, java, kotlin, text. No space before newline after the tag.
+- Body: valid syntax, correct indentation, real identifiers; no line-number prefixes inside the fence.
+- Use separate fences for unrelated snippets.
+- Never substitute HTML entities for code characters inside fences.
 
 === AGENT RESUME ===
 ${store.resumeContext}
@@ -504,24 +777,31 @@ ${store.resumeContext}
 === MISSION DESCRIPTION (JD) ===
 ${store.jdContext}
 ${domainInjection}`;
-            
-            const key = store.apiKey;
-            if (!key) throw new Error("API Key disconnected!");
-            
-            const url = 'https://api.groq.com/openai/v1/chat/completions';
-            const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` };
-            const body = JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: prompt } ],
-                max_tokens: 720,
-                temperature: 0.35
-            });
 
-            const response = await fetch(url, { method: 'POST', headers, body });
+            const provider = providerOverride || store.model || 'cerebras';
+            const key = keyOverride || store.apiKey;
+            if (!key) throw new Error('API Key disconnected!');
+            const cfg = PROVIDER_CONFIG[provider] || PROVIDER_CONFIG['cerebras'];
+            const modelId = modelOverride || cfg.model;
+
+            const response = await fetch(cfg.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': cfg.authHeader(key) },
+                body: JSON.stringify({
+                    model: modelId,
+                    messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: prompt } ],
+                    max_tokens: dynamicMaxTokens(),
+                    temperature: 0.35
+                })
+            });
             const data = await response.json();
-            if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+            if (!response.ok || data.error) throw new Error((data.error && (data.error.message || JSON.stringify(data.error))) || ('HTTP ' + response.status));
+            trackTokens(data.usage);
             return data.choices[0].message.content;
         }
+
+        // Legacy alias — now routes through fallback
+        async function queryLLM(prompt) { return queryLLMWithFallback(prompt); }
 
         async function queryLLMVision(dataUrl) {
             let domainInjection = store.domainContext ? `\n=== DOMAIN & TECHNICAL MEMORY ===\n${store.domainContext.substring(0, 15000)}` : "";
@@ -541,26 +821,44 @@ ${store.resumeContext}
 ${store.jdContext}
 ${domainInjection}`;
 
+            const provider = store.model || 'cerebras';
             const key = store.apiKey;
-            if (!key) throw new Error("API Key disconnected!");
-            
-            const url = 'https://api.groq.com/openai/v1/chat/completions';
-            const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` };
-            const body = JSON.stringify({
-                model: 'llama-3.2-90b-vision-preview',
-                messages: [ 
-                    { role: 'user', content: [
-                        { type: "text", text: systemPrompt },
-                        { type: "image_url", image_url: { url: dataUrl } }
-                    ] }
-                ],
-                max_tokens: 720,
-                temperature: 0.35
-            });
+            if (!key) throw new Error('API Key disconnected!');
 
-            const response = await fetch(url, { method: 'POST', headers, body });
+            // Vision endpoint: Gemini 2.0 Flash is best free option; else Groq scout
+            let visionUrl, visionModel, authKey, visionProvider;
+            if (provider === 'gemini') {
+                visionUrl      = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+                visionModel    = 'gemini-2.0-flash';
+                authKey        = key;
+                visionProvider = 'gemini';
+            } else {
+                // All other providers fall back to Groq scout for vision
+                const groqKey = store.groqFallbackKey || (provider === 'groq' ? key : null);
+                if (!groqKey) throw new Error('Vision requires a Groq API key. Set it in Settings → Groq Fallback Key (console.groq.com/keys).');
+                visionUrl      = 'https://api.groq.com/openai/v1/chat/completions';
+                visionModel    = 'meta-llama/llama-4-scout-17b-16e-instruct';
+                authKey        = groqKey;
+                visionProvider = 'groq';
+            }
+            updateProviderBadge(visionProvider, '👁 Vision');
+
+            const response = await fetch(visionUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authKey },
+                body: JSON.stringify({
+                    model: visionModel,
+                    messages: [{ role: 'user', content: [
+                        { type: 'text',      text: systemPrompt },
+                        { type: 'image_url', image_url: { url: dataUrl } }
+                    ]}],
+                    max_tokens: dynamicMaxTokens(),
+                    temperature: 0.35
+                })
+            });
             const data = await response.json();
             if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+            trackTokens(data.usage);
             return data.choices[0].message.content;
         }
 
@@ -578,12 +876,72 @@ ${domainInjection}`;
         });
 
         // Whisper STT — tuned to reduce silence/noise hallucinations (wrong "YouTube" style text)
-        const WHISPER_CHUNK_MS = 10000;
+        const WHISPER_CHUNK_NORMAL_MS = 10000;  // 10s in manual mode
+        const WHISPER_CHUNK_SMART_MS  = 20000;  // 20s in smart mode (~50% fewer API calls)
+        let   WHISPER_CHUNK_MS = WHISPER_CHUNK_SMART_MS; // default: smart
         const WHISPER_MIN_BLOB_BYTES = 4800;
         const WHISPER_BUFFER_MAX_CHARS = 1800;
         let whisperTranscriptTail = '';
         let whisperChunksOverMin = 0;
         let whisperLinesAccepted = 0;
+
+        // Smart auto-answer state — OFF by default (manual Ctrl+Shift+A batches full question = fewer wasted LLM calls)
+        let smartAutoAnswerEnabled = false;
+        let sessionAudioSeconds = 0;
+        let sessionWhisperCalls = 0;
+        let sessionAutoAnswered = 0;
+
+        // Load smart toggle from store (if user explicitly enabled it, respect that)
+        if (typeof store.smartAutoAnswer !== 'undefined') {
+            smartAutoAnswerEnabled = !!store.smartAutoAnswer;
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const chk = document.getElementById('smartAutoAnswer');
+            if (chk) { chk.checked = smartAutoAnswerEnabled; updateChunkLabel(); }
+        });
+        // Also run after script executes (elements already in DOM at this point)
+        setTimeout(() => {
+            const chk = document.getElementById('smartAutoAnswer');
+            if (chk) { chk.checked = smartAutoAnswerEnabled; updateChunkLabel(); }
+        }, 0);
+
+        function updateChunkLabel() {
+            WHISPER_CHUNK_MS = smartAutoAnswerEnabled ? WHISPER_CHUNK_SMART_MS : WHISPER_CHUNK_NORMAL_MS;
+            const el = document.getElementById('chunkLabel');
+            if (el) el.textContent = (WHISPER_CHUNK_MS / 1000) + 's';
+        }
+        function onSmartToggle() {
+            const chk = document.getElementById('smartAutoAnswer');
+            smartAutoAnswerEnabled = chk ? chk.checked : false;
+            store.smartAutoAnswer = smartAutoAnswerEnabled;
+            persistStore();
+            updateChunkLabel();
+        }
+        function updateAudioStats() {
+            const el = document.getElementById('audioSecondsEl');
+            const warn = document.getElementById('audioWarnEl');
+            const calls = document.getElementById('whisperCallsEl');
+            const autos = document.getElementById('autoAnsweredEl');
+            if (el) el.textContent = sessionAudioSeconds + 's';
+            if (warn) warn.textContent = sessionAudioSeconds > 20000 ? '⚠ >70% quota used!' : sessionAudioSeconds > 10000 ? '(>35% used)' : '';
+            if (calls) calls.textContent = sessionWhisperCalls;
+            if (autos) autos.textContent = sessionAutoAnswered;
+        }
+
+        // Question detection — pick keyword/question signals from live transcript
+        const Q_STARTERS = /\b(how|what|why|when|where|explain|describe|implement|write|design|tell me|can you|could you|walk me through|what's|what is|how does|how would|have you|do you|are you|which|define|compare|difference between|tradeoff|pros and cons|give me|show me|code|debug|fix|optimize|refactor)\b/i;
+        const TECH_KEYWORDS = /\b(async|await|mutex|deadlock|race condition|cache|memory|pointer|reference|virtual|override|template|generic|complexity|algorithm|tree|graph|queue|stack|heap|sort|search|api|rest|grpc|http|sql|nosql|index|join|concurrency|thread|process|container|docker|kubernetes|ci.?cd|pipeline|lambda|closure|singleton|factory|observer|pattern|architecture|microservice|monolith|latency|throughput|scalab|availab|consist|partition|cap theorem|distributed|consensus|raft|paxos|transformer|embedding|fine.?tun|llm|model|inference|gradient|backprop|tensorflow|pytorch|systemverilog|vhdl|fpga|rtl|synthesis|timing|setup|hold|clock|dma|interrupt|rtos|kernel)\b/i;
+
+        function isLikelyQuestion(text) {
+            const t = (text || '').trim();
+            if (!t || t.length < 15) return false;
+            if (t.includes('?')) return true;
+            // Question starter at beginning
+            if (/^(how|what|why|when|where|explain|describe|implement|write|design|tell me|can you|could you|walk me through|which|define|compare|give me|show me|code|debug|fix|optimize)/i.test(t)) return true;
+            // Tech keyword + question starter somewhere in text
+            if (Q_STARTERS.test(t) && TECH_KEYWORDS.test(t)) return true;
+            return false;
+        }
 
         function buildWhisperPrompt() {
             const base = 'Technical software engineering job interview. Interviewer asks about programming: C++ copy constructor move semantics RAII STL algorithms Python async. ';
@@ -723,6 +1081,9 @@ ${domainInjection}`;
 
                 if (blob.size >= WHISPER_MIN_BLOB_BYTES) {
                     whisperChunksOverMin++;
+                    sessionWhisperCalls++;
+                    sessionAudioSeconds += Math.round(WHISPER_CHUNK_MS / 1000);
+                    updateAudioStats();
                     runWhisperLoop();
 
                     try {
@@ -742,7 +1103,26 @@ ${domainInjection}`;
                                 accumulatedSpeechBuffer = accumulatedSpeechBuffer.slice(-WHISPER_BUFFER_MAX_CHARS);
                             }
                             whisperTranscriptTail = accumulatedSpeechBuffer.slice(-280);
-                            hudStatus('<strong style="color:#268bd2;">[Intel buffer]</strong> <span style="color:#657b83;">' + escapeHtml(accumulatedSpeechBuffer) + '</span>');
+                            updateBufferUI();
+                            if (smartAutoAnswerEnabled && isLikelyQuestion(trimmed)) {
+                                const q = accumulatedSpeechBuffer;
+                                slidingWindowClear();
+                                whisperTranscriptTail = accumulatedSpeechBuffer.slice(-280);
+                                ipcRenderer.send('stash-manual-draft', q);
+                                hudStatus('<em style="color:#2aa198;">🤖 Smart: question detected — answering…</em> <span style="color:#657b83;">' + escapeHtml(q.slice(0, 180)) + (q.length > 180 ? '…' : '') + '</span>');
+                                sessionAutoAnswered++;
+                                updateAudioStats();
+                                try {
+                                    const answer = await queryLLM(q);
+                                    hudFull('<strong style="color:#2aa198;">🤖 AUTO: ' + escapeHtml(q.slice(0, 120)) + (q.length > 120 ? '…' : '') + '</strong><br/><br/>' + wrapOverlayAnswer(formatInterviewAnswerHtml(answer)));
+                                    showStatus('🤖 Smart auto-answer fired!', 'rgba(42, 161, 152, 0.2)');
+                                } catch (ae) {
+                                    hudStatus('<span style="color:#dc322f">Auto-answer error: ' + escapeHtml(ae.message) + '</span>');
+                                }
+                            } else {
+                                hudStatus('<strong style="color:#268bd2;">[Intel buffer]</strong> <span style="color:#657b83;">' + escapeHtml(accumulatedSpeechBuffer) + '</span>' +
+                                    (smartAutoAnswerEnabled ? ' <span style="font-size:10px;color:#93a1a1;">(no question detected yet)</span>' : ''));
+                            }
                         }
                     } catch (e) { console.error('Whisper API Error: ' + e.message); }
                 } else {
@@ -761,10 +1141,13 @@ ${domainInjection}`;
 
         function stopSpeechMonitor() {
             isRecording = false; accumulatedSpeechBuffer = ""; whisperTranscriptTail = "";
+            undoBuffer = null;
+            whisperChunksOverMin = 0; whisperLinesAccepted = 0;
             if (audioStream) { audioStream.getTracks().forEach(track => track.stop()); audioStream = null; }
             document.getElementById('speechStatus').innerText = "Standby";
             document.getElementById('speechStatus').style.color = "var(--text-main)";
-            hudStatus('<span style="color:#586e75;">Audio tap disconnected.</span>');
+            updateBufferUI();
+            hudStatus('<span style="color:#586e75;">Audio tap disconnected. Session: ' + sessionWhisperCalls + ' Whisper calls, ' + sessionAudioSeconds + 's audio used.</span>');
         }
 
         ipcRenderer.on('process-audio-answer', async () => {
@@ -777,12 +1160,13 @@ ${domainInjection}`;
                 return;
             }
             const questionToAnswer = accumulatedSpeechBuffer;
-            accumulatedSpeechBuffer = "";
-            whisperTranscriptTail = "";
+            // Sliding window clear: saves undo snapshot, keeps tail as seed for next Q
+            slidingWindowClear();
             ipcRenderer.send('stash-manual-draft', questionToAnswer);
 
             showStatus('🚀 Decoding Hostile Audio...', 'rgba(38, 139, 210, 0.2)');
             hudStatus('<em style="color:#268bd2;">Decrypting / answering…</em> <span style="color:#657b83;">' + escapeHtml(questionToAnswer.slice(0, 220)) + (questionToAnswer.length > 220 ? '…' : '') + '</span>');
+            updateBufferUI();
 
             try {
                 const answer = await queryLLM(questionToAnswer);
@@ -795,6 +1179,8 @@ ${domainInjection}`;
         });
 
         // Manual question asked from HUD (typing/correction path)
+        ipcRenderer.on('undo-clear', () => { undoClear(); });
+
         ipcRenderer.on('manual-ask', async (event, rawText) => {
             const q = String(rawText || '').trim();
             if (!q) {

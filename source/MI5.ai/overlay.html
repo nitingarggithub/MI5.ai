@@ -178,11 +178,45 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(147, 161, 161, 0.4); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(147, 161, 161, 0.6); }
+        #bufferBar {
+            -webkit-app-region: no-drag;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: #657b83;
+            font-weight: 600;
+            background: rgba(38,139,210,0.08);
+            border: 1px solid rgba(38,139,210,0.2);
+            border-radius: 8px;
+            padding: 5px 10px;
+            flex: 0 0 auto;
+        }
+        #bufferBar.has-undo { background: rgba(42,161,152,0.12); border-color: rgba(42,161,152,0.35); }
+        #undoBtn {
+            border: 1px solid rgba(38,139,210,0.5);
+            background: rgba(38,139,210,0.15);
+            color: #268bd2;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 11px;
+            display: none;
+        }
+        #undoBtn.visible { display: inline-block; }
+        #undoBtn:active { transform: translateY(1px); }
     </style>
 </head>
 <body>
     <div class="layout">
         <div id="hudStatus" aria-live="polite"></div>
+        <!-- Buffer bar -->
+        <div id="bufferBar">
+            <span>🎙</span>
+            <span id="bufBarText">Buffer: 0 chars</span>
+            <button id="undoBtn" title="Restore last answered buffer (Ctrl+Shift+Z)">↩ Undo Clear</button>
+        </div>
         <div id="answer"><em>MI5.ai ready. Waiting for intercept...</em></div>
 
         <div class="controls">
@@ -215,11 +249,15 @@
         const manualClearBtn = document.getElementById('manualClearBtn');
         const manualStatus = document.getElementById('manualStatus');
         const clearAnswerBtn = document.getElementById('clearAnswerBtn');
-
         const hudStatusEl = document.getElementById('hudStatus');
+        const bufferBar = document.getElementById('bufferBar');
+        const bufBarText = document.getElementById('bufBarText');
+        const undoBtn = document.getElementById('undoBtn');
 
+        let _statusTimer = null;
         function setHudStatus(html) {
             const s = String(html || '').trim();
+            if (_statusTimer) { clearTimeout(_statusTimer); _statusTimer = null; }
             if (!s) {
                 hudStatusEl.innerHTML = '';
                 hudStatusEl.style.display = 'none';
@@ -227,7 +265,29 @@
             }
             hudStatusEl.style.display = 'block';
             hudStatusEl.innerHTML = s;
+            // Auto-clear status after 30s to prevent stale messages
+            _statusTimer = setTimeout(() => {
+                hudStatusEl.innerHTML = '';
+                hudStatusEl.style.display = 'none';
+            }, 30000);
         }
+
+        ipcRenderer.on('update-buffer-state', (event, state) => {
+            if (!state) return;
+            bufBarText.textContent = 'Buffer: ' + state.chars + ' chars';
+            if (state.hasUndo) {
+                bufferBar.classList.add('has-undo');
+                undoBtn.classList.add('visible');
+            } else {
+                bufferBar.classList.remove('has-undo');
+                undoBtn.classList.remove('visible');
+            }
+        });
+
+        undoBtn.addEventListener('click', () => {
+            ipcRenderer.send('overlay-undo-clear');
+            ipcRenderer.send('overlay-bring-to-front');
+        });
 
         function setManualOpen(open) {
             if (open) {
