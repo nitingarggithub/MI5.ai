@@ -1,0 +1,24 @@
+# Logs
+session_logs.jsonl
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Secrets
+secrets.json
+.env
+
+# User Data
+source/MI5.ai/store.json
+source/MI5.ai/session_logs.jsonl
+source/MI5.ai/secrets.json
+
+# Node modules
+node_modules/
+dist/
+build/
+out/

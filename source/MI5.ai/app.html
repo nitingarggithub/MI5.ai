@@ -146,27 +146,29 @@
         </div>
         <div style="margin-bottom: 15px;">
             <label>Primary API Key (Cerebras / Groq / Gemini)</label>
-            <input type="password" id="apiKey" placeholder="Enter API Key (e.g. gsk_ / csk_ / AIza...)">
+            <input type="password" id="apiKey" placeholder="Enter API Key (e.g. gsk_ / csk- / AIza...)">
         </div>
         <div style="margin-bottom: 15px;">
-            <label>Groq Fallback Key <span style="font-weight:400;color:#93a1a1;">(needed when primary is Cerebras, for Vision + Specialist fallback)</span></label>
-            <input type="password" id="groqFallbackKey" placeholder="gsk_... (get free at console.groq.com/keys)">
+            <label>Groq Fallback Key <span style="font-weight:400;color:#93a1a1;">(needed for Vision / Reasoning)</span></label>
+            <input type="password" id="groqFallbackKey" placeholder="gsk_...">
         </div>
         <div style="margin-bottom: 15px;">
-            <label>🔬 Specialist Mode <span style="font-weight:400;color:#93a1a1;">(auto-routes deep technical Qs to a reasoning model via Groq)</span></label>
+            <label>🔬 Specialist Mode <span style="font-weight:400;color:#93a1a1;">(auto-routes deep technical Qs to reasoning models via Groq)</span></label>
             <select id="specialistMode">
                 <option value="">OFF — use selected provider for everything</option>
                 <option value="deepseek-r1">🧠 DeepSeek-R1 Distill 70B — BEST for C++/SystemC/TLM/SoC (reasoning, via Groq)</option>
-                <option value="qwq-32b">⚡ QwQ-32B — Qwen reasoning model, strong on architecture &amp; Python (via Groq)</option>
+                <option value="qwen-2.5-coder-32b">💻 Qwen 2.5 Coder 32B — Coding Expert (via Groq)</option>
             </select>
             <div style="font-size:0.78em; color:#b58900; margin-top:6px; line-height:1.5;">
-                💡 <strong>DeepSeek-R1</strong> is the best <em>free</em> model for SystemVerilog/TLM 2.0/SoC — it thinks step-by-step before answering (reasoning traces). Requires a Groq key above.<br/>
-                🔧 To <strong>train your own</strong>: fine-tune <code>Qwen2.5-Coder-7B</code> or <code>DeepSeek-Coder-V2-Lite-16B</code> on 1000+ SystemC/TLM Q&amp;A pairs using LoRA (HuggingFace + Unsloth). Inject trained adapter via Ollama locally.
+                💡 <strong>DeepSeek-R1</strong> is best for hardware/architecture reasoning. <strong>Qwen 2.5 Coder</strong> is best for C++ and Python implementation. Requires a Groq key above.
             </div>
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button onclick="document.getElementById('settingsModal').close()" class="btn-ghost" style="border:1px solid #ccc; color:var(--text-main);">Cancel</button>
-            <button onclick="saveConfig()" class="btn-blue">Save Configuration</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px;">
+            <button onclick="probeModels()" class="btn-ghost" style="padding: 10px; font-size: 0.8em; border-color: var(--accent-blue); color: var(--accent-blue);">🔍 Probe Available Models</button>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="document.getElementById('settingsModal').close()" class="btn-ghost" style="border:1px solid #ccc; color:var(--text-main);">Cancel</button>
+                <button onclick="saveConfig()" class="btn-blue">Save Configuration</button>
+            </div>
         </div>
     </dialog>
 
@@ -227,8 +229,18 @@
             <label style="display:block; font-weight:600; font-size:0.9em; color: var(--header);">Interview microphone (Whisper)</label>
             <p style="font-size: 0.85em; margin: 6px 0 8px 0;">USB headset: plug in, click <strong>Refresh microphone list</strong>, choose the Jabra input, then start Engage again if it was already running.</p>
             <select id="micSelect" onchange="onMicSelectChange()"></select>
-            <div style="margin-top: 10px;">
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 12px;">
                 <button type="button" onclick="refreshMicInputList()" class="btn-blue" style="padding: 10px 16px;">Refresh microphone list</button>
+                <div style="flex: 1; height: 10px; background: rgba(147,161,161,0.2); border-radius: 5px; overflow: hidden; position: relative;">
+                    <div id="volumeBar" style="height: 100%; width: 0%; background: var(--accent-green); transition: width 0.1s;"></div>
+                </div>
+                <span id="volumeVal" style="font-size: 0.8em; min-width: 30px;">0%</span>
+            </div>
+            <div id="audioTroubleshoot" style="margin-top: 10px; font-size: 0.82em; background: rgba(181,137,0,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(181,137,0,0.3); display: none;">
+                <strong style="color:#b58900;">🔇 Audio Troubleshooting:</strong><br/>
+                • If the meter above isn't moving, the mic is dead or permission was denied.<br/>
+                • <strong>Hearing the interviewer:</strong> To capture Teams/Zoom audio, you MUST select <strong>"Stereo Mix"</strong> (or a Virtual Cable) in the list above. A normal headset mic only hears <em>you</em>.<br/>
+                • Enable "Stereo Mix" in Windows Sound Settings → Recording tab (right-click empty space if hidden).
             </div>
         </div>
 
@@ -313,39 +325,49 @@
         });
 
         const storePath = path.join(__dirname, 'store.json');
+        const secretsPath = path.join(__dirname, 'secrets.json');
         
         let store = {
             model: 'cerebras',
-            apiKey: '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',
-            groqFallbackKey: '',
             specialistMode: '',
             resumeContext: '',
             jdContext: '',
             domainContext: '',
-            audioInputDeviceId: ''
+            audioInputDeviceId: '',
+            smartAutoAnswer: false
         };
-        // In-memory undo buffer — sliding window (ephemeral, session only)
-        let undoBuffer = null;        // holds { full, tail } of last Ctrl+Shift+A clear
-        const TAIL_CHARS = 320;       // chars kept as seed after clear (~2 Whisper chunks)
 
+        let secrets = {
+            apiKey: '',
+            groqFallbackKey: ''
+        };
+
+        // Load non-sensitive store
         try {
             if (fs.existsSync(storePath)) {
                 const data = JSON.parse(fs.readFileSync(storePath, 'utf8'));
                 store = { ...store, ...data };
-            } else {
-                fs.writeFileSync(storePath, JSON.stringify(store));
             }
         } catch (e) { console.error("Config load error"); }
+
+        // Load sensitive secrets
+        try {
+            if (fs.existsSync(secretsPath)) {
+                const data = JSON.parse(fs.readFileSync(secretsPath, 'utf8'));
+                secrets = { ...secrets, ...data };
+            }
+        } catch (e) { console.warn("Secrets not found - will be created on save"); }
+
         if (store.audioInputDeviceId == null) store.audioInputDeviceId = '';
 
         document.getElementById('modelSelect').value = store.model || 'cerebras';
-        document.getElementById('apiKey').value = store.apiKey;
+        document.getElementById('apiKey').value = secrets.apiKey || '';
         if (store.resumeContext) document.getElementById('resumeStatus').innerText = "Intel Uploaded";
         if (store.jdContext) document.getElementById('jdStatus').innerText = "Intel Uploaded";
         updateDomainViewer();
         setTimeout(() => {
             const gfk = document.getElementById('groqFallbackKey');
-            if (gfk) gfk.value = store.groqFallbackKey || '';
+            if (gfk) gfk.value = secrets.groqFallbackKey || '';
             const sm = document.getElementById('specialistMode');
             if (sm) sm.value = store.specialistMode || '';
             updateProviderBadge(store.model || 'cerebras');
@@ -353,21 +375,46 @@
 
         function saveConfig() {
             store.model = document.getElementById('modelSelect').value;
-            store.apiKey = document.getElementById('apiKey').value;
+            secrets.apiKey = document.getElementById('apiKey').value;
             const gfk = document.getElementById('groqFallbackKey');
-            if (gfk) store.groqFallbackKey = (gfk.value || '').trim();
+            if (gfk) secrets.groqFallbackKey = (gfk.value || '').trim();
             const sm = document.getElementById('specialistMode');
             if (sm) store.specialistMode = (sm.value || '').trim();
             const ms = document.getElementById('micSelect');
             if (ms) store.audioInputDeviceId = (ms.value || '').trim();
-            autoFallbackProvider = null; // reset fallback on config save
+            autoFallbackProvider = null; 
             persistStore();
+            persistSecrets();
             document.getElementById('settingsModal').close();
             updateProviderBadge(store.model || 'cerebras');
-            showStatus('✅ Engine Configuration saved. Provider: ' + (store.model || 'cerebras') + (store.specialistMode ? ' + Specialist: ' + store.specialistMode : ''), 'rgba(133, 153, 0, 0.2)');
+            showStatus('✅ Engine Configuration saved.', 'rgba(133, 153, 0, 0.2)');
         }
 
         function persistStore() { fs.writeFileSync(storePath, JSON.stringify(store)); }
+        function persistSecrets() { fs.writeFileSync(secretsPath, JSON.stringify(secrets)); }
+
+        async function probeModels() {
+            const provider = document.getElementById('modelSelect').value;
+            const key = document.getElementById('apiKey').value;
+            if (!key) { alert("Enter an API key first!"); return; }
+            const cfg = PROVIDER_CONFIG[provider];
+            if (!cfg) { alert("Provider not supported for probe"); return; }
+            
+            // OpenAI standard /models endpoint
+            const modelsUrl = cfg.url.replace('/chat/completions', '/models');
+            showStatus('🔍 Probing models for ' + provider + '...', 'rgba(38,139,210,0.2)');
+            try {
+                const res = await fetch(modelsUrl, { headers: { 'Authorization': cfg.authHeader(key) } });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error.message);
+                const ids = (data.data || []).map(m => m.id).join('\n');
+                alert("Available Models for " + provider + ":\n\n" + ids);
+                showStatus('✅ Probe complete.', 'rgba(133, 153, 0, 0.2)');
+            } catch (e) {
+                alert("Probe failed: " + e.message);
+                showStatus('❌ Probe failed: ' + e.message, '#dc322f');
+            }
+        }
 
         function buildAudioInputConstraints() {
             const audio = {
@@ -616,13 +663,13 @@
             gemini:      { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
                            model: 'gemini-2.0-flash',           authHeader: key => 'Bearer ' + key },
             cerebras:    { url: 'https://api.cerebras.ai/v1/chat/completions',
-                           model: 'llama-3.3-70b',              authHeader: key => 'Bearer ' + key },
+                           model: 'llama3.3-70b',               authHeader: key => 'Bearer ' + key },
             groq:        { url: 'https://api.groq.com/openai/v1/chat/completions',
-                           model: 'llama-3.3-70b-versatile',    authHeader: key => 'Bearer ' + key },
+                           model: 'llama-3.3-70b',              authHeader: key => 'Bearer ' + key },
             grok:        { url: 'https://api.x.ai/v1/chat/completions',
-                           model: 'grok-3-mini',                authHeader: key => 'Bearer ' + key },
+                           model: 'grok-2-1212',                authHeader: key => 'Bearer ' + key },
             openrouter:  { url: 'https://openrouter.ai/api/v1/chat/completions',
-                           model: 'meta-llama/llama-4-scout:free', authHeader: key => 'Bearer ' + key }
+                           model: 'google/gemma-2-9b-it:free',  authHeader: key => 'Bearer ' + key }
         };
 
         const PROVIDER_VISION_CONFIG = {
@@ -637,9 +684,9 @@
         // ── Specialist model config (Groq-hosted reasoning models) ───────
         const SPECIALIST_CONFIG = {
             'deepseek-r1': { url: 'https://api.groq.com/openai/v1/chat/completions',
-                             model: 'deepseek-r1-distill-llama-70b' },
-            'qwq-32b':     { url: 'https://api.groq.com/openai/v1/chat/completions',
-                             model: 'qwq-32b' }
+                             model: 'deepseek-r1-distill-qwen-32b' }, // Updated from decommissioned llama-70b
+            'qwen-2.5-coder-32b': { url: 'https://api.groq.com/openai/v1/chat/completions',
+                                    model: 'qwen-2.5-coder-32b' }
         };
 
         // Technical specialist trigger — fire when prompt contains deep domain keywords
@@ -751,8 +798,9 @@
 
         // queryLLMDirect: low-level call with optional overrides
         async function queryLLMDirect(prompt, providerOverride, modelOverride, keyOverride) {
-            let domainInjection = store.domainContext ? `\n=== DOMAIN & TECHNICAL MEMORY ===\n${store.domainContext.substring(0, 15000)}` : "";
-            const isSpecialist = !!(modelOverride); // specialist mode gets extra reasoning instruction
+            // Optimized: reduce domain memory to 8000 chars to save tokens
+            let domainInjection = store.domainContext ? `\n=== DOMAIN & TECHNICAL MEMORY ===\n${store.domainContext.substring(0, 8000)}` : "";
+            const isSpecialist = !!(modelOverride); 
             const systemPrompt = `You are MI5.ai, covert interview support. Ground every answer in the Agent Resume, JD, and Domain Memory below. Prefer domain terminology the hiring panel expects.${isSpecialist ? '\n\nSPECIALIST MODE: This is a deep technical question. Think through the mechanism step by step before answering, then present only the crisp conclusion. Do NOT show reasoning steps in the final answer.' : ''}
 
 Interview output contract (follow strictly):
@@ -779,25 +827,68 @@ ${store.jdContext}
 ${domainInjection}`;
 
             const provider = providerOverride || store.model || 'cerebras';
-            const key = keyOverride || store.apiKey;
+            const key = keyOverride || secrets.apiKey;
             if (!key) throw new Error('API Key disconnected!');
             const cfg = PROVIDER_CONFIG[provider] || PROVIDER_CONFIG['cerebras'];
-            const modelId = modelOverride || cfg.model;
+            let modelId = modelOverride || cfg.model;
 
-            const response = await fetch(cfg.url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': cfg.authHeader(key) },
-                body: JSON.stringify({
+            async function performRequest(mId) {
+                const resp = await fetch(cfg.url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': cfg.authHeader(key) },
+                    body: JSON.stringify({
+                        model: mId,
+                        messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: prompt } ],
+                        max_tokens: dynamicMaxTokens(),
+                        temperature: 0.35
+                    })
+                });
+                const d = await resp.json();
+                if (!resp.ok || d.error) {
+                    const msg = (d.error && (d.error.message || JSON.stringify(d.error))) || ('HTTP ' + resp.status);
+                    const err = new Error(msg);
+                    err.status = resp.status;
+                    throw err;
+                }
+                return d;
+            }
+
+            try {
+                let data;
+                try {
+                    data = await performRequest(modelId);
+                } catch (err) {
+                    // Automatic fallback for Cerebras 404
+                    if (provider === 'cerebras' && err.status === 404 && modelId !== 'llama3.1-8b') {
+                        console.warn('Cerebras 404 for ' + modelId + ', falling back to llama3.1-8b');
+                        modelId = 'llama3.1-8b';
+                        data = await performRequest(modelId);
+                    } else {
+                        throw err;
+                    }
+                }
+                
+                trackTokens(data.usage);
+                const result = data.choices[0].message.content;
+                
+                ipcRenderer.send('log-interaction', {
+                    provider: provider,
                     model: modelId,
-                    messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: prompt } ],
-                    max_tokens: dynamicMaxTokens(),
-                    temperature: 0.35
-                })
-            });
-            const data = await response.json();
-            if (!response.ok || data.error) throw new Error((data.error && (data.error.message || JSON.stringify(data.error))) || ('HTTP ' + response.status));
-            trackTokens(data.usage);
-            return data.choices[0].message.content;
+                    tokens: data.usage,
+                    prompt_snippet: prompt.substring(0, 500),
+                    answer_snippet: result.substring(0, 500)
+                });
+                return result;
+
+            } catch (finalErr) {
+                ipcRenderer.send('log-interaction', {
+                    provider: provider,
+                    model: modelId,
+                    error: finalErr.message,
+                    status: finalErr.status
+                });
+                throw finalErr;
+            }
         }
 
         // Legacy alias — now routes through fallback
@@ -993,7 +1084,22 @@ ${domainInjection}`;
             return plain;
         }
 
-        async function transcribeWhisperChunk(blob, apiKey) {
+        function getGroqApiKey() {
+            const primary = secrets.apiKey || '';
+            const fallback = secrets.groqFallbackKey || '';
+            // If primary is Groq (starts with gsk_), use it.
+            if (primary.startsWith('gsk_')) return primary;
+            // Otherwise use fallback if it's Groq.
+            if (fallback.startsWith('gsk_')) return fallback;
+            // Last resort: return primary and hope for the best (or return empty to trigger error)
+            return primary;
+        }
+
+        async function transcribeWhisperChunk(blob) {
+            const apiKey = getGroqApiKey();
+            if (!apiKey || !apiKey.startsWith('gsk_')) {
+                throw new Error('Whisper requires a Groq API key (starts with gsk_). Set it in Settings.');
+            }
             const file = new File([blob], 'chunk.webm', { type: blob.type || 'audio/webm' });
             const formData = new FormData();
             formData.append('file', file);
@@ -1017,7 +1123,11 @@ ${domainInjection}`;
             return extractWhisperTextFromApiPayload(data);
         }
 
-        async function transcribeWhisperChunkPlainJson(blob, apiKey) {
+        async function transcribeWhisperChunkPlainJson(blob) {
+            const apiKey = getGroqApiKey();
+            if (!apiKey || !apiKey.startsWith('gsk_')) {
+                throw new Error('Whisper requires a Groq API key (starts with gsk_). Set it in Settings.');
+            }
             const file = new File([blob], 'chunk.webm', { type: blob.type || 'audio/webm' });
             const formData = new FormData();
             formData.append('file', file);
@@ -1038,16 +1148,49 @@ ${domainInjection}`;
             return isLikelyWhisperHallucination(t) ? '' : t;
         }
 
-        // Whisper STT Accumulator (state)
-        let audioStream = null;
-        let isRecording = false;
-        let accumulatedSpeechBuffer = "";
+        let audioContext = null;
+        let analyser = null;
+        let meterInterval = null;
+
+        function updateVolumeMeter(stream) {
+            if (meterInterval) clearInterval(meterInterval);
+            if (!stream) {
+                document.getElementById('volumeBar').style.width = '0%';
+                document.getElementById('volumeVal').textContent = '0%';
+                return;
+            }
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                source.connect(analyser);
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
+                meterInterval = setInterval(() => {
+                    analyser.getByteFrequencyData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+                    const avg = sum / dataArray.length;
+                    const pct = Math.min(100, Math.round((avg / 128) * 100));
+                    document.getElementById('volumeBar').style.width = pct + '%';
+                    document.getElementById('volumeVal').textContent = pct + '%';
+                    if (pct > 50) document.getElementById('volumeBar').style.background = '#859900';
+                    else if (pct > 10) document.getElementById('volumeBar').style.background = '#2aa198';
+                    else document.getElementById('volumeBar').style.background = '#268bd2';
+                }, 100);
+            } catch (e) { console.error('Meter error:', e); }
+        }
 
         async function startSpeechMonitor() {
             try {
                 whisperChunksOverMin = 0;
                 whisperLinesAccepted = 0;
-                audioStream = await navigator.mediaDevices.getUserMedia(buildAudioInputConstraints());
+                const constraints = buildAudioInputConstraints();
+                audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+                updateVolumeMeter(audioStream);
+                document.getElementById('audioTroubleshoot').style.display = 'block';
+                
                 document.getElementById('speechStatus').innerText = "Tracking Audio...(Wait for Ctrl+Shift+A)";
                 document.getElementById('speechStatus').style.color = "var(--accent-red)";
                 accumulatedSpeechBuffer = "";
@@ -1055,7 +1198,10 @@ ${domainInjection}`;
                 hudStatus('<span style="color:#dc322f;">Audio tap active — speak or capture interviewer audio. Status + live transcript appear here; answers stay below until ready.</span>');
                 isRecording = true;
                 runWhisperLoop();
-            } catch (err) { showStatus("Audio Error: " + err.message, "#dc322f"); }
+            } catch (err) { 
+                showStatus("Audio Error: " + err.message, "#dc322f"); 
+                document.getElementById('audioTroubleshoot').style.display = 'block';
+            }
         }
 
         function pickRecorderMimeType() {
@@ -1089,10 +1235,10 @@ ${domainInjection}`;
                     try {
                         let text = '';
                         try {
-                            text = await transcribeWhisperChunk(blob, store.apiKey);
+                            text = await transcribeWhisperChunk(blob);
                         } catch (verboseErr) {
                             console.warn('Whisper verbose_json failed, retrying json:', verboseErr.message);
-                            text = await transcribeWhisperChunkPlainJson(blob, store.apiKey);
+                            text = await transcribeWhisperChunkPlainJson(blob);
                         }
                         const trimmed = (text || '').trim();
                         const alphaNumLen = trimmed.replace(/[^a-zA-Z0-9]/g, '').length;
@@ -1123,9 +1269,21 @@ ${domainInjection}`;
                                 hudStatus('<strong style="color:#268bd2;">[Intel buffer]</strong> <span style="color:#657b83;">' + escapeHtml(accumulatedSpeechBuffer) + '</span>' +
                                     (smartAutoAnswerEnabled ? ' <span style="font-size:10px;color:#93a1a1;">(no question detected yet)</span>' : ''));
                             }
+                        } else {
+                            // If no text but we had sound, maybe it's just silence/noise?
+                            if (whisperChunksOverMin % 3 === 0) {
+                                hudStatus('<span style="color:#93a1a1; font-size: 0.85em;">Listening... (No speech detected in last chunk)</span>');
+                            }
                         }
-                    } catch (e) { console.error('Whisper API Error: ' + e.message); }
+                    } catch (e) { 
+                        console.error('Whisper API Error: ' + e.message);
+                        hudStatus('<span style="color:#dc322f">Whisper Error: ' + escapeHtml(e.message) + '</span>');
+                    }
                 } else {
+                    // Small blob: mic might not be picking up sound
+                    if (whisperChunksOverMin % 2 === 0) {
+                        hudStatus('<span style="color:#b58900; font-size: 0.85em;">⚠ Mic signal weak or silent (blob: ' + blob.size + 'B). Check input device!</span>');
+                    }
                     runWhisperLoop();
                 }
             };
@@ -1144,6 +1302,9 @@ ${domainInjection}`;
             undoBuffer = null;
             whisperChunksOverMin = 0; whisperLinesAccepted = 0;
             if (audioStream) { audioStream.getTracks().forEach(track => track.stop()); audioStream = null; }
+            if (meterInterval) { clearInterval(meterInterval); meterInterval = null; }
+            updateVolumeMeter(null);
+            document.getElementById('audioTroubleshoot').style.display = 'none';
             document.getElementById('speechStatus').innerText = "Standby";
             document.getElementById('speechStatus').style.color = "var(--text-main)";
             updateBufferUI();

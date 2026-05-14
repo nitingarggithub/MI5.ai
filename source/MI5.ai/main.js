@@ -281,6 +281,18 @@ ipcMain.on('stash-manual-draft', (event, draft) => {
   }
 });
 
+// interaction logging
+ipcMain.on('log-interaction', (event, entry) => {
+  try {
+    const logPath = path.join(__dirname, 'session_logs.jsonl');
+    const logData = JSON.stringify({
+      timestamp: new Date().toISOString(),
+      ...entry
+    }) + '\n';
+    fs.appendFileSync(logPath, logData);
+  } catch (e) { console.error('Logging error:', e); }
+});
+
 const fs = require('fs');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
