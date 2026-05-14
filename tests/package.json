@@ -1,0 +1,18 @@
+{
+  "name": "mi5-tests",
+  "version": "1.0.0",
+  "description": "MI5.ai full test suite",
+  "main": "run-all.js",
+  "scripts": {
+    "test":          "node run-all.js",
+    "test:offline":  "node run-all.js --no-network",
+    "test:qa":       "node test-qa-engine.js",
+    "test:store":    "node test-store.js",
+    "test:ipc":      "node test-ipc-handlers.js",
+    "test:whisper":  "node test-whisper.js",
+    "test:vision":   "node test-vision.js",
+    "test:llm":      "node test-llm-providers.js",
+    "test:keys":     "node test-api-keys.js"
+  },
+  "dependencies": {}
+}

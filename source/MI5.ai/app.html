@@ -103,20 +103,19 @@
         .warning { color: #b58900; font-weight: 500; display: block; margin-top: 4px;}
         .error { color: var(--accent-red); font-weight: 500; display: block; margin-top: 4px;}
 
-        /* Settings Modal */
-        dialog {
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 30px;
-            background: var(--bg);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-            width: 500px;
-            color: var(--text-main);
-        }
-        dialog::backdrop {
-            background: rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(4px);
-        }
+        /* Q/A Pairs */
+        .qa-table { width: 100%; border-collapse: collapse; font-size: 0.875em; margin-top: 10px; }
+        .qa-table th { background: rgba(147,161,161,0.15); color: var(--header); font-weight: 600; padding: 8px 10px; text-align: left; border-bottom: 2px solid var(--border); }
+        .qa-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.45; }
+        .qa-table tr:hover td { background: rgba(38,139,210,0.06); }
+        .qa-table .qa-q { color: var(--header); font-weight: 500; max-width: 260px; }
+        .qa-table .qa-a { color: var(--text-main); max-width: 340px; white-space: pre-wrap; word-break: break-word; }
+        .qa-table .qa-hits { text-align: center; color: #2aa198; font-weight: 700; min-width: 36px; }
+        .qa-table .qa-actions { white-space: nowrap; }
+        .qa-tag { display: inline-block; background: rgba(38,139,210,0.12); color: var(--accent-blue); border-radius: 4px; padding: 1px 6px; font-size: 0.78em; margin: 1px 2px; }
+        .qa-hit-badge { display: inline-block; background: rgba(42,161,152,0.15); color: #2aa198; border-radius: 4px; padding: 2px 8px; font-size: 0.8em; font-weight: 700; margin-left: 6px; }
+        .qa-miss-badge { display: inline-block; background: rgba(181,137,0,0.12); color: #b58900; border-radius: 4px; padding: 2px 8px; font-size: 0.8em; font-weight: 700; margin-left: 6px; }
+        #qaEditModal { width: 600px; max-width: 95vw; }
         
     </style>
 </head>
@@ -312,6 +311,64 @@
         <div id="status"></div>
     </div>
 
+    <!-- Q/A Edit / Add Dialog -->
+    <dialog id="qaEditModal">
+        <h3 style="margin-top:0;" id="qaEditTitle">Add Q/A Pair</h3>
+        <div style="margin-bottom:12px;">
+            <label>Question <span style="font-weight:400;color:#93a1a1;font-size:0.85em;">(what the interviewer asks)</span></label>
+            <textarea id="qaEditQ" rows="3" placeholder="e.g. Explain RAII in C++…" style="width:calc(100% - 26px);"></textarea>
+        </div>
+        <div style="margin-bottom:12px;">
+            <label>Answer <span style="font-weight:400;color:#93a1a1;font-size:0.85em;">(your prepared response)</span></label>
+            <textarea id="qaEditA" rows="6" placeholder="Your concise prepared answer…" style="width:calc(100% - 26px);"></textarea>
+        </div>
+        <div style="margin-bottom:20px;">
+            <label>Tags <span style="font-weight:400;color:#93a1a1;font-size:0.85em;">(comma-separated, optional)</span></label>
+            <input type="text" id="qaEditTags" placeholder="e.g. c++, memory, raii">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button onclick="document.getElementById('qaEditModal').close()" class="btn-ghost" style="border:1px solid #ccc;color:var(--text-main);">Cancel</button>
+            <button onclick="saveQAPair()" class="btn-blue" id="qaEditSaveBtn">Save Pair</button>
+        </div>
+    </dialog>
+
+    <div class="card" style="border-left: 4px solid #2aa198;">
+        <h3>4. Q/A Memory Bank <span id="qaBadge" style="font-size:0.75em; font-weight:400; color:#93a1a1; margin-left:8px;">0 pairs</span></h3>
+        <p style="font-size:0.9em; margin-bottom:12px;">Stored answers are checked <strong>before</strong> every LLM call. Hits are instant — no API cost. Add your prepared answers here or let MI5 auto-save good LLM answers.</p>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
+            <input type="text" id="qaSearch" placeholder="🔍 Search pairs…" oninput="renderQATable()" style="flex:1; min-width:160px; margin-top:0; padding:9px 12px;">
+            <button onclick="openQAAddDialog()" class="btn-blue" style="padding:9px 16px;">+ Add Pair</button>
+            <button onclick="exportQAPairs()" class="btn-ghost" style="border:1px solid var(--accent-blue);color:var(--accent-blue);padding:9px 14px;">⬇ Export</button>
+            <label style="cursor:pointer; padding:9px 14px; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:8px; font-size:0.875em; font-weight:600; background:transparent;" title="Import JSON file">⬆ Import<input type="file" accept=".json" onchange="importQAPairs(event)" style="display:none;"></label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85em; cursor:pointer;">
+                <input type="checkbox" id="qaAutoSave" style="width:auto;margin-top:0;accent-color:var(--accent-blue);" onchange="onQAAutoSaveToggle()">
+                Auto-save LLM answers
+            </label>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="qa-table" id="qaTableEl">
+                <thead><tr>
+                    <th style="width:28%;">Question</th>
+                    <th>Answer</th>
+                    <th style="width:90px;">Tags</th>
+                    <th style="width:46px;text-align:center;">Hits</th>
+                    <th style="width:80px;">Actions</th>
+                </tr></thead>
+                <tbody id="qaTableBody"></tbody>
+            </table>
+            <div id="qaEmptyMsg" style="text-align:center; padding:28px; color:#93a1a1; font-size:0.9em; display:none;">No pairs yet — click <strong>+ Add Pair</strong> or answer questions to build memory.</div>
+        </div>
+
+        <div style="margin-top:10px; font-size:0.8em; color:#93a1a1; display:flex; gap:20px; flex-wrap:wrap;">
+            <span>📚 Total: <strong id="qaTotalEl">0</strong></span>
+            <span>⚡ LLM calls saved: <strong id="qaHitsEl">0</strong></span>
+            <span>🎯 Match threshold: <strong id="qaThreshEl">55%</strong></span>
+            <span>Last match: <span id="qaLastMatchEl" style="color:var(--header);">—</span></span>
+        </div>
+    </div>
+
     <script>
         const fs = require('fs');
         const path = require('path');
@@ -326,7 +383,193 @@
 
         const storePath = path.join(__dirname, 'store.json');
         const secretsPath = path.join(__dirname, 'secrets.json');
-        
+        const qaPairsPath = path.join(__dirname, 'qa_pairs.json');
+
+        // ── Q/A Pairs store ───────────────────────────────────────────────
+        let qaPairs    = [];    // [{id, q, a, tags:[], hits, createdAt, lastUsed}]
+        let qaHitCount = 0;     // session LLM-call saves
+        let qaAutoSave = false; // auto-save good LLM answers to the bank
+        const QA_SIM_THRESHOLD = 0.55; // cosine similarity threshold
+
+        function loadQAPairs() {
+            try {
+                if (fs.existsSync(qaPairsPath)) {
+                    const raw = JSON.parse(fs.readFileSync(qaPairsPath, 'utf8'));
+                    qaPairs = Array.isArray(raw) ? raw : [];
+                }
+            } catch(e) { qaPairs = []; }
+        }
+        function persistQAPairs() {
+            try { fs.writeFileSync(qaPairsPath, JSON.stringify(qaPairs, null, 2)); }
+            catch(e) { console.error('qa_pairs save error', e); }
+        }
+        loadQAPairs();
+
+        // ── Similarity engine (word-bag cosine, zero external deps) ─────────
+        function tokenize(text) {
+            return (text || '').toLowerCase()
+                .replace(/[^a-z0-9_+#]/g, ' ')
+                .split(/\s+/)
+                .filter(w => w.length > 1);
+        }
+        function buildTF(tokens) {
+            const tf = {};
+            for (const t of tokens) tf[t] = (tf[t] || 0) + 1;
+            return tf;
+        }
+        function cosineSim(tokA, tokB) {
+            const tfA = buildTF(tokA), tfB = buildTF(tokB);
+            const keys = new Set([...Object.keys(tfA), ...Object.keys(tfB)]);
+            let dot = 0, normA = 0, normB = 0;
+            for (const k of keys) {
+                const a = tfA[k] || 0, b = tfB[k] || 0;
+                dot += a * b; normA += a * a; normB += b * b;
+            }
+            return (!normA || !normB) ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB));
+        }
+        const QA_STOP = new Set(['the','a','an','is','are','was','were','be','been','being',
+            'have','has','had','do','does','did','will','would','could','should','may','might',
+            'must','shall','to','of','in','on','at','by','for','with','from','into','and','or',
+            'not','no','it','its','this','that','what','how','why','when','where','which','who',
+            'can','you','your','me','my','we','our','they','their','i','am','if','just','about']);
+
+        function matchQAPair(prompt) {
+            if (!qaPairs.length) return null;
+            const tokP = tokenize(prompt).filter(w => !QA_STOP.has(w));
+            if (!tokP.length) return null;
+            let best = null, bestScore = 0;
+            for (const pair of qaPairs) {
+                const tokQ = tokenize(pair.q).filter(w => !QA_STOP.has(w));
+                const score = cosineSim(tokP, tokQ);
+                if (score > bestScore) { bestScore = score; best = pair; }
+            }
+            return bestScore >= QA_SIM_THRESHOLD ? { pair: best, score: bestScore } : null;
+        }
+
+        // ── CRUD helpers ─────────────────────────────────────────────────────
+        function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+        function addQAPair(q, a, tags = []) {
+            // Deduplicate: update if near-identical question already exists
+            const tokQ = tokenize(q).filter(w => !QA_STOP.has(w));
+            const dup  = qaPairs.find(p => cosineSim(tokenize(p.q).filter(w => !QA_STOP.has(w)), tokQ) > 0.92);
+            if (dup) { dup.a = a; dup.tags = tags; persistQAPairs(); renderQATable(); return dup; }
+            const pair = { id: genId(), q: q.trim(), a: a.trim(), tags, hits: 0,
+                           createdAt: new Date().toISOString(), lastUsed: null };
+            qaPairs.unshift(pair);
+            persistQAPairs(); renderQATable();
+            return pair;
+        }
+        function deleteQAPair(id) {
+            qaPairs = qaPairs.filter(p => p.id !== id);
+            persistQAPairs(); renderQATable();
+        }
+
+        // ── UI Rendering ─────────────────────────────────────────────────────
+        function renderQATable() {
+            const tbody  = document.getElementById('qaTableBody');
+            const empty  = document.getElementById('qaEmptyMsg');
+            if (!tbody) return;
+            const q = (document.getElementById('qaSearch')?.value || '').toLowerCase().trim();
+            const rows = q
+                ? qaPairs.filter(p => p.q.toLowerCase().includes(q) || p.a.toLowerCase().includes(q) ||
+                                      (p.tags||[]).join(' ').toLowerCase().includes(q))
+                : qaPairs;
+            tbody.innerHTML = '';
+            empty.style.display = rows.length ? 'none' : 'block';
+            for (const p of rows) {
+                const tr = document.createElement('tr');
+                const tagHtml  = (p.tags||[]).map(t => `<span class="qa-tag">${escapeHtml(t)}</span>`).join('');
+                const aPreview = p.a.length > 200 ? escapeHtml(p.a.slice(0,200)) + '…' : escapeHtml(p.a);
+                tr.innerHTML = `
+                    <td class="qa-q" title="${escapeHtml(p.q)}">${escapeHtml(p.q.length>120 ? p.q.slice(0,120)+'…' : p.q)}</td>
+                    <td class="qa-a">${aPreview}</td>
+                    <td>${tagHtml}</td>
+                    <td class="qa-hits">${p.hits}</td>
+                    <td class="qa-actions">
+                        <button onclick="openQAEditDialog('${p.id}')" class="btn-blue" style="padding:4px 9px;font-size:0.78em;">Edit</button>
+                        <button onclick="deleteQAPair('${p.id}')" class="btn-ghost" style="padding:4px 8px;font-size:0.78em;margin-left:4px;">✕</button>
+                    </td>`;
+                tbody.appendChild(tr);
+            }
+            const badge  = document.getElementById('qaBadge');
+            const totEl  = document.getElementById('qaTotalEl');
+            const hitsEl = document.getElementById('qaHitsEl');
+            if (badge)  badge.textContent  = qaPairs.length + ' pair' + (qaPairs.length !== 1 ? 's' : '');
+            if (totEl)  totEl.textContent  = qaPairs.length;
+            if (hitsEl) hitsEl.textContent = qaHitCount;
+        }
+
+        // ── Dialog helpers ───────────────────────────────────────────────────
+        let qaEditId = null;
+        function openQAAddDialog() {
+            qaEditId = null;
+            document.getElementById('qaEditTitle').textContent = 'Add Q/A Pair';
+            document.getElementById('qaEditQ').value  = '';
+            document.getElementById('qaEditA').value  = '';
+            document.getElementById('qaEditTags').value = '';
+            document.getElementById('qaEditSaveBtn').textContent = 'Save Pair';
+            document.getElementById('qaEditModal').showModal();
+            setTimeout(() => document.getElementById('qaEditQ').focus(), 50);
+        }
+        function openQAEditDialog(id) {
+            const p = qaPairs.find(x => x.id === id);
+            if (!p) return;
+            qaEditId = id;
+            document.getElementById('qaEditTitle').textContent = 'Edit Q/A Pair';
+            document.getElementById('qaEditQ').value  = p.q;
+            document.getElementById('qaEditA').value  = p.a;
+            document.getElementById('qaEditTags').value = (p.tags||[]).join(', ');
+            document.getElementById('qaEditSaveBtn').textContent = 'Update Pair';
+            document.getElementById('qaEditModal').showModal();
+            setTimeout(() => document.getElementById('qaEditQ').focus(), 50);
+        }
+        function saveQAPair() {
+            const q    = document.getElementById('qaEditQ').value.trim();
+            const a    = document.getElementById('qaEditA').value.trim();
+            const tags = document.getElementById('qaEditTags').value.split(',').map(t=>t.trim()).filter(Boolean);
+            if (!q || !a) { alert('Both Question and Answer are required.'); return; }
+            if (qaEditId) {
+                const p = qaPairs.find(x => x.id === qaEditId);
+                if (p) { p.q = q; p.a = a; p.tags = tags; persistQAPairs(); }
+            } else {
+                addQAPair(q, a, tags);
+            }
+            renderQATable();
+            document.getElementById('qaEditModal').close();
+        }
+        function exportQAPairs() {
+            const blob = new Blob([JSON.stringify(qaPairs, null, 2)], { type: 'application/json' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href = url; a.download = 'mi5_qa_pairs.json'; a.click();
+            URL.revokeObjectURL(url);
+        }
+        function importQAPairs(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (!Array.isArray(imported)) throw new Error('Expected a JSON array');
+                    let added = 0;
+                    for (const p of imported) {
+                        if (p.q && p.a && !qaPairs.find(x => x.id === p.id)) {
+                            qaPairs.push({ ...p, id: p.id || genId() }); added++;
+                        }
+                    }
+                    persistQAPairs(); renderQATable();
+                    showStatus(`✅ Imported ${added} new Q/A pairs.`, 'rgba(133,153,0,0.2)');
+                } catch(err) { showStatus('❌ Import failed: ' + err.message, '#dc322f'); }
+            };
+            reader.readAsText(file); event.target.value = '';
+        }
+        function onQAAutoSaveToggle() {
+            qaAutoSave = document.getElementById('qaAutoSave')?.checked || false;
+        }
+        // Init table once DOM is ready
+        setTimeout(() => renderQATable(), 10);
+
         let store = {
             model: 'cerebras',
             specialistMode: '',
@@ -891,8 +1134,41 @@ ${domainInjection}`;
             }
         }
 
-        // Legacy alias — now routes through fallback
-        async function queryLLM(prompt) { return queryLLMWithFallback(prompt); }
+        // Legacy alias — now routes through QA cache → fallback chain
+        async function queryLLM(prompt) {
+            // ── 1. Check Q/A Memory Bank first ───────────────────
+            const hit = matchQAPair(prompt);
+            if (hit) {
+                const { pair, score } = hit;
+                pair.hits++;
+                pair.lastUsed = new Date().toISOString();
+                persistQAPairs();
+                qaHitCount++;
+                renderQATable();
+                const pct = Math.round(score * 100);
+                const lastEl = document.getElementById('qaLastMatchEl');
+                if (lastEl) lastEl.textContent = `"${pair.q.slice(0,50)}${pair.q.length>50?'…':''}" (${pct}%)`;
+                updateProviderBadge('📚 Memory', `${pct}% match — no LLM call`);
+                showStatus(`📚 Q/A Memory hit (${pct}% match) — instant answer, 0 tokens used.`, 'rgba(42,161,152,0.15)');
+                hudStatus(`<span class="qa-hit-badge">📚 Memory ${pct}%</span> <em style="color:#2aa198;">Answered from Q/A bank — no API call</em>`);
+                return pair.a;
+            }
+
+            // ── 2. No cache hit — call LLM ────────────────────────
+            const answer = await queryLLMWithFallback(prompt);
+
+            // ── 3. Auto-save toggle ───────────────────────────────
+            if (qaAutoSave && answer && prompt.length > 20) {
+                const shortQ = prompt.slice(0, 400);
+                const existing = matchQAPair(shortQ);
+                if (!existing || existing.score < 0.92) {
+                    addQAPair(shortQ, answer, []);
+                    showStatus('💾 Answer auto-saved to Q/A Memory Bank.', 'rgba(42,161,152,0.1)');
+                }
+            }
+
+            return answer;
+        }
 
         async function queryLLMVision(dataUrl) {
             let domainInjection = store.domainContext ? `\n=== DOMAIN & TECHNICAL MEMORY ===\n${store.domainContext.substring(0, 15000)}` : "";
