@@ -216,6 +216,7 @@
             <span>🎙</span>
             <span id="bufBarText">Buffer: 0 chars</span>
             <button id="undoBtn" title="Restore last answered buffer (Ctrl+Shift+Z)">↩ Undo Clear</button>
+            <button id="closeOverlayBtn" title="Hide overlay (Ctrl+Shift+O or Esc)" style="margin-left:auto;background:transparent;border:none;color:#657b83;font-size:16px;cursor:pointer;padding:0 4px;line-height:1;" onmouseover="this.style.color='#dc322f'" onmouseout="this.style.color='#657b83'">✕</button>
         </div>
         <div id="answer"><em>MI5.ai ready. Waiting for intercept...</em></div>
 
@@ -364,6 +365,16 @@
 
         ipcRenderer.on('manual-ack', (event, msg) => {
             manualStatus.textContent = String(msg || 'Sent');
+        });
+
+        document.getElementById('closeOverlayBtn').addEventListener('click', () => {
+            ipcRenderer.send('hide-overlay');
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !manualPanel.classList.contains('open')) {
+                ipcRenderer.send('hide-overlay');
+            }
         });
 
         document.addEventListener('pointerdown', () => {

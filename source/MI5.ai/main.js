@@ -297,6 +297,15 @@ const fs = require('fs');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 
+ipcMain.handle('get-desktop-sources', async () => {
+  const sources = await desktopCapturer.getSources({ types: ['screen'] });
+  return sources.map(s => ({ id: s.id, name: s.name }));
+});
+
+ipcMain.on('hide-overlay', () => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide();
+});
+
 ipcMain.handle('parse-file', async (event, { buffer, name }) => {
   try {
     const nodeBuffer = Buffer.from(buffer);

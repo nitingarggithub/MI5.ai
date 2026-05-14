@@ -124,7 +124,7 @@
     <h1>🕵️‍♂️ MI5.ai Dashboard</h1>
 
     <!-- Hidden Settings Dialog -->
-    <dialog id="settingsModal">
+    <dialog id="settingsModal" style="max-height:90vh; overflow-y:auto;">
         <h3 style="margin-top:0;">API Engine Configuration</h3>
         <p style="font-size: 0.9em; margin-bottom: 20px;">Configure your backend Intel servers.</p>
         <div style="margin-bottom: 15px;">
@@ -160,6 +160,17 @@
             </select>
             <div style="font-size:0.78em; color:#b58900; margin-top:6px; line-height:1.5;">
                 💡 <strong>DeepSeek-R1</strong> is best for hardware/architecture reasoning. <strong>Qwen 2.5 Coder</strong> is best for C++ and Python implementation. Requires a Groq key above.
+            </div>
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>🎙 Whisper Capture Mode</label>
+            <select id="captureMode">
+                <option value="mic">🎙 Mic only — hears you speaking (default)</option>
+                <option value="loopback">🔊 System audio loopback — hears interviewer via headset/speakers</option>
+                <option value="both">🎙+🔊 Both merged — RECOMMENDED for full conversation capture</option>
+            </select>
+            <div style="font-size:0.78em; color:#93a1a1; margin-top:6px; line-height:1.5;">
+                💡 Use <strong>Loopback</strong> or <strong>Both</strong> when on a Teams/Zoom call with a headset — captures the interviewer's audio directly from system output. If loopback is silent, Teams may be in exclusive audio mode: go to Teams → Settings → Devices → disable Noise Suppression.
             </div>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px;">
@@ -577,7 +588,9 @@
             jdContext: '',
             domainContext: '',
             audioInputDeviceId: '',
-            smartAutoAnswer: false
+            smartAutoAnswer: false,
+            captureMode: 'mic',
+            loopbackDeviceId: ''
         };
 
         let secrets = {
@@ -613,6 +626,8 @@
             if (gfk) gfk.value = secrets.groqFallbackKey || '';
             const sm = document.getElementById('specialistMode');
             if (sm) sm.value = store.specialistMode || '';
+            const cm = document.getElementById('captureMode');
+            if (cm) cm.value = store.captureMode || 'mic';
             updateProviderBadge(store.model || 'cerebras');
         }, 0);
 
@@ -625,6 +640,8 @@
             if (sm) store.specialistMode = (sm.value || '').trim();
             const ms = document.getElementById('micSelect');
             if (ms) store.audioInputDeviceId = (ms.value || '').trim();
+            const cm = document.getElementById('captureMode');
+            if (cm) store.captureMode = cm.value || 'mic';
             autoFallbackProvider = null; 
             persistStore();
             persistSecrets();
@@ -657,6 +674,66 @@
                 alert("Probe failed: " + e.message);
                 showStatus('❌ Probe failed: ' + e.message, '#dc322f');
             }
+        }
+
+        let loopbackAudioCtx = null; // AudioContext used when merging streams — must close on stop
+
+        async function buildLoopbackStream() {
+            const sources = await ipcRenderer.invoke('get-desktop-sources');
+            if (!sources || sources.length === 0) throw new Error('No desktop sources found for loopback capture');
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: sources[0].id
+                    }
+                },
+                video: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        maxWidth: 1,
+                        maxHeight: 1
+                    }
+                }
+            });
+            // Drop the dummy video track — we only care about audio
+            stream.getVideoTracks().forEach(t => t.stop());
+            return stream;
+        }
+
+        function buildMergedStream(micStream, loopbackStream) {
+            const ctx = new AudioContext();
+            loopbackAudioCtx = ctx;
+            const merger = ctx.createChannelMerger(2);
+            const micSrc = ctx.createMediaStreamSource(micStream);
+            const loopSrc = ctx.createMediaStreamSource(loopbackStream);
+            const dest = ctx.createMediaStreamDestination();
+            micSrc.connect(merger, 0, 0);
+            loopSrc.connect(merger, 0, 1);
+            merger.connect(dest);
+            return dest.stream;
+        }
+
+        // Detect silence on loopback after 6s — warn about Teams exclusive mode
+        function watchLoopbackSilence(stream) {
+            const ctx = new AudioContext();
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 256;
+            const src = ctx.createMediaStreamSource(stream);
+            src.connect(analyser);
+            const buf = new Uint8Array(analyser.frequencyBinCount);
+            const start = Date.now();
+            const iv = setInterval(() => {
+                analyser.getByteFrequencyData(buf);
+                const peak = buf.reduce((a, b) => Math.max(a, b), 0);
+                if (Date.now() - start > 6000) {
+                    clearInterval(iv);
+                    ctx.close();
+                    if (peak === 0) {
+                        showStatus('⚠️ Loopback stream is silent — Teams may be using exclusive audio mode. Go to Teams → Settings → Devices → disable Noise Suppression / Exclusive Mode.', '#b58900');
+                    }
+                }
+            }, 500);
         }
 
         function buildAudioInputConstraints() {
@@ -1248,9 +1325,14 @@ ${domainInjection}`;
         let   WHISPER_CHUNK_MS = WHISPER_CHUNK_SMART_MS; // default: smart
         const WHISPER_MIN_BLOB_BYTES = 4800;
         const WHISPER_BUFFER_MAX_CHARS = 1800;
+        const TAIL_CHARS = 120; // chars kept as seed after sliding-window clear
         let whisperTranscriptTail = '';
         let whisperChunksOverMin = 0;
         let whisperLinesAccepted = 0;
+        let isRecording = false;
+        let audioStream = null;
+        let accumulatedSpeechBuffer = '';
+        let undoBuffer = null;
 
         // Smart auto-answer state — OFF by default (manual Ctrl+Shift+A batches full question = fewer wasted LLM calls)
         let smartAutoAnswerEnabled = false;
@@ -1462,16 +1544,37 @@ ${domainInjection}`;
             try {
                 whisperChunksOverMin = 0;
                 whisperLinesAccepted = 0;
-                const constraints = buildAudioInputConstraints();
-                audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const mode = store.captureMode || 'mic';
+
+                if (mode === 'loopback') {
+                    audioStream = await buildLoopbackStream();
+                    watchLoopbackSilence(audioStream);
+                } else if (mode === 'both') {
+                    const micStream = await navigator.mediaDevices.getUserMedia(buildAudioInputConstraints());
+                    const loopbackStream = await buildLoopbackStream();
+                    audioStream = buildMergedStream(micStream, loopbackStream);
+                    watchLoopbackSilence(loopbackStream);
+                } else {
+                    // default: mic only
+                    audioStream = await navigator.mediaDevices.getUserMedia(buildAudioInputConstraints());
+                }
+
                 updateVolumeMeter(audioStream);
                 document.getElementById('audioTroubleshoot').style.display = 'block';
-                
-                document.getElementById('speechStatus').innerText = "Tracking Audio...(Wait for Ctrl+Shift+A)";
+
+                // Diagnostic: log what tracks we actually got
+                const tracks = audioStream.getAudioTracks();
+                console.log('[Whisper] Audio tracks:', tracks.map(t => t.label + ' enabled=' + t.enabled + ' readyState=' + t.readyState));
+                if (tracks.length === 0) {
+                    showStatus('⚠️ No audio tracks in stream — check mic/loopback settings.', '#b58900');
+                }
+
+                const modeLabel = mode === 'loopback' ? '🔊 Loopback' : mode === 'both' ? '🎙+🔊 Merged' : '🎙 Mic';
+                document.getElementById('speechStatus').innerText = `Tracking Audio [${modeLabel}]...(Wait for Ctrl+Shift+A)`;
                 document.getElementById('speechStatus').style.color = "var(--accent-red)";
                 accumulatedSpeechBuffer = "";
                 whisperTranscriptTail = "";
-                hudStatus('<span style="color:#dc322f;">Audio tap active — speak or capture interviewer audio. Status + live transcript appear here; answers stay below until ready.</span>');
+                hudStatus(`<span style="color:#dc322f;">Audio tap active [${modeLabel}] — capturing audio. Status + live transcript appear here; answers stay below until ready.</span>`);
                 isRecording = true;
                 runWhisperLoop();
             } catch (err) { 
@@ -1553,7 +1656,11 @@ ${domainInjection}`;
                         }
                     } catch (e) { 
                         console.error('Whisper API Error: ' + e.message);
+                        showStatus('❌ Whisper: ' + e.message, '#dc322f');
                         hudStatus('<span style="color:#dc322f">Whisper Error: ' + escapeHtml(e.message) + '</span>');
+                        if (e.message.includes('401') || e.message.includes('API key')) {
+                            stopSpeechMonitor();
+                        }
                     }
                 } else {
                     // Small blob: mic might not be picking up sound
@@ -1567,6 +1674,8 @@ ${domainInjection}`;
                 recorder.start();
             } catch (e) {
                 console.error('MediaRecorder.start failed', e);
+                showStatus('⚠️ MediaRecorder failed to start: ' + e.message, '#dc322f');
+                hudStatus('<span style="color:#dc322f">⚠️ Recorder error: ' + escapeHtml(e.message) + '. Try switching Capture Mode to Mic only.</span>');
                 if (isRecording) setTimeout(runWhisperLoop, 500);
                 return;
             }
@@ -1577,6 +1686,7 @@ ${domainInjection}`;
             isRecording = false; accumulatedSpeechBuffer = ""; whisperTranscriptTail = "";
             undoBuffer = null;
             whisperChunksOverMin = 0; whisperLinesAccepted = 0;
+            if (loopbackAudioCtx) { try { loopbackAudioCtx.close(); } catch(e){} loopbackAudioCtx = null; }
             if (audioStream) { audioStream.getTracks().forEach(track => track.stop()); audioStream = null; }
             if (meterInterval) { clearInterval(meterInterval); meterInterval = null; }
             updateVolumeMeter(null);
