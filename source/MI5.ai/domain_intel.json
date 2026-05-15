@@ -1,0 +1,117 @@
+[
+  {
+    "q": "What is the difference between LT and AT modeling in SystemC TLM 2.0?",
+    "a": "LT (Loosely Timed) modeling uses the b_transport interface where processes can run ahead of simulation time (temporal decoupling), making it ideal for software development. AT (Approximately Timed) modeling uses the 4-phase nb_transport interface (BEGIN_REQ, END_REQ, BEGIN_RESP, END_RESP) and is used for performance analysis and architectural exploration where timing accuracy matters.",
+    "tags": ["SystemC", "TLM", "Hardware Modeling"]
+  },
+  {
+    "q": "Explain b_transport vs nb_transport in TLM 2.0.",
+    "a": "b_transport (blocking) is the core of LT modeling; it completes a transaction in a single function call, often using a 'quantum' to allow temporal decoupling. nb_transport (non-blocking) is the core of AT modeling; it uses a 4-phase handshake (REQ/RESP phases) and return values (TLM_ACCEPTED, TLM_UPDATED, TLM_COMPLETED) to represent hardware pipelining and arbitration.",
+    "tags": ["SystemC", "TLM", "API"]
+  },
+  {
+    "q": "What is RAII in C++?",
+    "a": "RAII (Resource Acquisition Is Initialization) is a programming idiom where resource lifecycle (memory, file handles, mutexes) is tied to object lifetime. The resource is acquired in the constructor and released in the destructor, ensuring no leaks even in the presence of exceptions.",
+    "tags": ["C++", "Memory Management"]
+  },
+  {
+    "q": "Explain Cache Coherency and the MESI protocol.",
+    "a": "Cache Coherency ensures all processors in a multi-core SoC see the same data. MESI (Modified, Exclusive, Shared, Invalid) is a snooping-based protocol. 'Modified' means the line is dirty and only in this cache; 'Exclusive' means it's clean and only in this cache; 'Shared' means it's clean and in multiple caches; 'Invalid' means the data is stale.",
+    "tags": ["Computer Architecture", "SoC"]
+  },
+  {
+    "q": "How does Python's Asyncio event loop work?",
+    "a": "Asyncio is single-threaded concurrency. The Event Loop manages tasks (coroutines). When a coroutine hits an 'await', it yields control back to the loop, which then checks for other ready tasks (I/O or timers). It uses selectors (epoll/kqueue) to monitor file descriptors without blocking the main thread.",
+    "tags": ["Python", "Concurrency"]
+  },
+  {
+    "q": "What is the 4-phase handshake in TLM 2.0 Approximately Timed (AT) modeling?",
+    "a": "The 4-phase handshake consists of: 1. BEGIN_REQ (Initiator starts request), 2. END_REQ (Target acknowledges request), 3. BEGIN_RESP (Target starts response), and 4. END_RESP (Initiator acknowledges response). It uses nb_transport_fw and nb_transport_bw calls and is essential for modeling pipelined bus protocols like AXI.",
+    "tags": ["SystemC", "TLM", "AT Modeling"]
+  },
+  {
+    "q": "Explain Temporal Decoupling and the Global Quantum.",
+    "a": "Temporal Decoupling allows SystemC processes to run ahead of simulation time to improve speed. The 'Global Quantum' is the maximum time a process can run ahead before it must synchronize with the kernel (sc_wait). It is used primarily in Loosely Timed (LT) models to minimize context switching overhead.",
+    "tags": ["SystemC", "TLM", "Performance"]
+  },
+  {
+    "q": "What is a 'Payload Event Queue' (PEQ) in TLM 2.0?",
+    "a": "A PEQ is a utility used in Target modules to manage transactions that have different timing offsets. It allows a target to receive an nb_transport call and schedule the actual processing or response at a future simulation time, which is critical for accurate Approximately Timed (AT) modeling.",
+    "tags": ["SystemC", "TLM", "Utilities"]
+  },
+  {
+    "q": "Explain AXI4 Out-of-Order (OoO) completion.",
+    "a": "AXI4 supports Out-of-Order completion using ID tags. Transactions with different IDs can complete in any order, allowing slow peripherals to be bypassed by fast ones. Transactions with the same ID must complete in the order they were issued to maintain data integrity.",
+    "tags": ["Computer Architecture", "AXI4", "SoC"]
+  },
+  {
+    "q": "What is a Translation Lookaside Buffer (TLB)?",
+    "a": "A TLB is a high-speed hardware cache that stores recent virtual-to-physical memory address mappings. It resides near the MMU and reduces the need to perform slow multi-level page table walks in main memory during every memory access.",
+    "tags": ["Computer Architecture", "Virtual Memory"]
+  },
+  {
+    "q": "Describe the difference between Write-Through and Write-Back caches.",
+    "a": "In a Write-Through cache, data is written to both the cache and main memory simultaneously, ensuring consistency but at the cost of higher bus traffic. In a Write-Back cache, data is only written to the cache, and the line is marked 'Dirty'; the write to main memory only happens when the line is evicted.",
+    "tags": ["Computer Architecture", "Caching"]
+  },
+  {
+    "q": "What is the difference between lvalue and rvalue references in C++11?",
+    "a": "An lvalue reference (&) refers to an object that has a persistent memory address (an identity). An rvalue reference (&&) refers to a temporary object (an expiring value) that is about to be destroyed. rvalue references enable 'Move Semantics', allowing resources to be transferred rather than copied, significantly improving performance for containers like std::vector.",
+    "tags": ["C++", "Move Semantics"]
+  },
+  {
+    "q": "How does a 'vtable' (virtual table) work in C++ polymorphism?",
+    "a": "The vtable is a static array of function pointers created for each class with virtual functions. Each object of that class contains a hidden 'vptr' (virtual pointer) pointing to the vtable. At runtime, a virtual function call is resolved by looking up the function address in the vtable via the vptr, enabling dynamic dispatch.",
+    "tags": ["C++", "Object Oriented"]
+  },
+  {
+    "q": "When should you use the 'volatile' keyword in C/C++?",
+    "a": "The 'volatile' keyword tells the compiler that a variable's value can change at any time without action from the nearby code. It prevents the compiler from optimizing out repeated reads/writes. It is essential for memory-mapped I/O (registers), shared memory in multi-threaded systems (though not for thread safety), and variables modified in signal/interrupt handlers.",
+    "tags": ["C", "C++", "Embedded"]
+  },
+  {
+    "q": "Explain the Global Interpreter Lock (GIL) in Python.",
+    "a": "The GIL is a mutex that protects access to Python objects, preventing multiple native threads from executing Python bytecodes at once. This simplifies memory management but limits CPU-bound multi-threading. For CPU parallelism, Python developers use the 'multiprocessing' module or extensions written in C/C++.",
+    "tags": ["Python", "Internals"]
+  },
+  {
+    "q": "What is the difference between a Python List and a Tuple?",
+    "a": "Lists are mutable (can be changed after creation) and have overhead for resizing. Tuples are immutable (read-only) and are more memory-efficient. Tuples can be used as keys in a dictionary (if they contain only hashable items), whereas lists cannot.",
+    "tags": ["Python", "Data Structures"]
+  },
+  {
+    "q": "How do C++ smart pointers (std::unique_ptr vs std::shared_ptr) work?",
+    "a": "std::unique_ptr represents exclusive ownership; it cannot be copied, only moved. It has zero overhead. std::shared_ptr represents shared ownership via reference counting; when the count reaches zero, the resource is deleted. shared_ptr has a control block overhead and is used when multiple objects must manage a single resource.",
+    "tags": ["C++", "Memory Management"]
+  },
+  {
+    "q": "What is Priority Inversion and how do you solve it?",
+    "a": "Priority Inversion occurs when a high-priority task is blocked by a low-priority task that holds a resource, and a medium-priority task preempts the low-priority task, indefinitely delaying the high-priority task. Solutions include Priority Inheritance (the low-priority task temporarily 'inherits' the high priority) or Priority Ceiling Protocol.",
+    "tags": ["Embedded SW", "RTOS"]
+  },
+  {
+    "q": "Explain Interrupt Latency vs Interrupt Jitter.",
+    "a": "Interrupt Latency is the time between the interrupt trigger and the start of the ISR. Interrupt Jitter is the variation in that latency over time. Both are critical for hard real-time systems; jitter is often worse than high constant latency as it makes the system unpredictable.",
+    "tags": ["Embedded SW", "Real-Time"]
+  },
+  {
+    "q": "What are the advantages of Virtual Platforms (VP) in Pre-silicon modeling?",
+    "a": "Virtual Platforms (using SystemC/TLM) enable 'Shift Left' strategies, allowing software development to begin months before RTL is ready. They provide high simulation speed (10-100 MHz), full system visibility (no probes needed), and easier debugging of kernel/driver code compared to FPGA or Emulation.",
+    "tags": ["Pre-silicon", "Virtual Platforms", "Shift Left"]
+  },
+  {
+    "q": "Compare Emulation (Palladium/Zebu) vs FPGA Prototyping (HAPS).",
+    "a": "Emulation (Palladium/Zebu) offers fast compile times, high visibility (all signals), and massive capacity, but at a very high cost and lower speed (1-5 MHz). FPGA Prototyping (HAPS) is faster (10-100 MHz) and cheaper, but has long compile times, limited signal visibility, and harder multi-FPGA partitioning.",
+    "tags": ["Pre-silicon", "Emulation", "Prototyping"]
+  },
+  {
+    "q": "What is 'Checkpoint and Restore' in simulation modeling?",
+    "a": "Checkpoint and Restore is a technique where the full state of a simulation (CPU registers, memory, peripherals) is saved to disk at a specific point in time. This allows developers to 'restore' and resume simulation from that point repeatedly, skipping slow boot cycles or reaching specific crash points instantly.",
+    "tags": ["Pre-silicon", "Modeling"]
+  },
+  {
+    "q": "Explain Co-simulation in the context of SystemC and RTL.",
+    "a": "Co-simulation involves running a high-level SystemC/TLM model alongside a low-level RTL (Verilog/VHDL) model in the same simulation environment. An adapter/wrapper converts TLM transactions into RTL pin-wiggles (e.g., AXI transactions to signals), allowing incremental refinement of the SoC design.",
+    "tags": ["Pre-silicon", "SystemC", "RTL"]
+  }
+]

@@ -403,9 +403,11 @@
         const storePath = path.join(__dirname, 'store.json');
         const secretsPath = path.join(__dirname, 'secrets.json');
         const qaPairsPath = path.join(__dirname, 'qa_pairs.json');
+        const domainIntelPath = path.join(__dirname, 'domain_intel.json');
 
         // ── Q/A Pairs store ───────────────────────────────────────────────
-        let qaPairs    = [];    // [{id, q, a, tags:[], hits, createdAt, lastUsed}]
+        let qaPairs    = [];    // User's personal bank
+        let domainIntel = [];   // Global technical bank (Synthesized)
         let qaHitCount = 0;     // session LLM-call saves
         let qaAutoSave = false; // auto-save good LLM answers to the bank
         const QA_SIM_THRESHOLD = 0.55; // cosine similarity threshold
@@ -416,7 +418,11 @@
                     const raw = JSON.parse(fs.readFileSync(qaPairsPath, 'utf8'));
                     qaPairs = Array.isArray(raw) ? raw : [];
                 }
-            } catch(e) { qaPairs = []; }
+                if (fs.existsSync(domainIntelPath)) {
+                    const raw = JSON.parse(fs.readFileSync(domainIntelPath, 'utf8'));
+                    domainIntel = Array.isArray(raw) ? raw : [];
+                }
+            } catch(e) { console.warn('Knowledge base load error', e); }
         }
         function persistQAPairs() {
             try { fs.writeFileSync(qaPairsPath, JSON.stringify(qaPairs, null, 2)); }
@@ -451,18 +457,25 @@
             'must','shall','to','of','in','on','at','by','for','with','from','into','and','or',
             'not','no','it','its','this','that','what','how','why','when','where','which','who',
             'can','you','your','me','my','we','our','they','their','i','am','if','just','about']);
-
-        function matchQAPair(prompt) {
-            if (!qaPairs.length) return null;
-            const tokP = tokenize(prompt).filter(w => !QA_STOP.has(w));
-            if (!tokP.length) return null;
-            let best = null, bestScore = 0;
-            for (const pair of qaPairs) {
-                const tokQ = tokenize(pair.q).filter(w => !QA_STOP.has(w));
-                const score = cosineSim(tokP, tokQ);
-                if (score > bestScore) { bestScore = score; best = pair; }
+        function findMatch(question) {
+            const queryTokens = tokenize(question);
+            if (queryTokens.length < 3) return null;
+            const queryTF = buildTF(queryTokens);
+            
+            // Check User Bank & Global Domain Intel (Synthesized Cache)
+            const allBanks = [...qaPairs, ...domainIntel];
+            let best = null, bestSim = 0;
+            
+            for (const pair of allBanks) {
+                const pairTokens = tokenize(pair.q);
+                const pairTF = buildTF(pairTokens);
+                const sim = cosineSim(queryTF, pairTF);
+                if (sim > bestSim && sim >= (store.qaThreshold || QA_SIM_THRESHOLD)) {
+                    bestSim = sim;
+                    best = pair;
+                }
             }
-            return bestScore >= QA_SIM_THRESHOLD ? { pair: best, score: bestScore } : null;
+            return best ? { ...best, score: Math.round(bestSim * 100) } : null;
         }
 
         // ── CRUD helpers ─────────────────────────────────────────────────────
@@ -1129,11 +1142,24 @@
 
         // queryLLMDirect: low-level call with optional overrides
         async function queryLLMDirect(prompt, providerOverride, modelOverride, keyOverride) {
-            // Optimized: reduce domain memory to 8000 chars to save tokens
-            let domainInjection = store.domainContext ? `\n=== DOMAIN & TECHNICAL MEMORY ===\n${store.domainContext.substring(0, 8000)}` : "";
+            // HALLUCINATION SHIELD: Technical Glossary
+            const techGlossary = `
+TECHNICAL GLOSSARY (Strict Enforcement):
+- AT = Approximately Timed modeling (4-phase nb_transport, timing accurate). NEVER "Abstract Modeling".
+- LT = Loosely Timed modeling (blocking b_transport, temporal decoupling, fast SW dev).
+- PEQ = Payload Event Queue (handles timing offsets in AT).
+- VP = Virtual Platform (SystemC/TLM based SoC model).
+- MESI = Cache coherency protocol (Modified, Exclusive, Shared, Invalid).
+- Priority Inversion = High-priority task blocked by low-priority task holding a mutex.
+- Shift Left = Starting SW dev on Virtual Platforms before RTL/Silicon is ready.`;
+
+            // Optimized: reduce domain memory to 6000 chars to save tokens
+            let domainInjection = store.domainContext ? `\n=== DOMAIN & TECHNICAL MEMORY ===\n${store.domainContext.substring(0, 6000)}` : "";
             const isSpecialist = !!(modelOverride); 
             const systemPrompt = `You are MI5.ai, a high-level technical interview strategist. 
 Ground every answer in the Agent Resume, JD, and Domain Memory.
+
+${techGlossary}
 
 STRATEGIC ANSWER STRUCTURE (The Golden Ratio):
 1. HEADLINE: One crisp, direct sentence answering the core question.
