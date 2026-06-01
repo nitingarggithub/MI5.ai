@@ -206,6 +206,11 @@
         }
         #undoBtn.visible { display: inline-block; }
         #undoBtn:active { transform: translateY(1px); }
+        .mi5-divider {
+            border: 0;
+            border-top: 1px dashed rgba(147, 161, 161, 0.45);
+            margin: 18px 0;
+        }
     </style>
 </head>
 <body>
@@ -226,6 +231,7 @@
                 <span class="hint">Ctrl+Enter to send</span>
             </div>
             <div class="controls-right">
+                <button class="btn" id="restoreAnswerBtn" type="button" style="display: none; margin-right: 4px;" title="Restore last cleared or overwritten answer(s)">Restore</button>
                 <button class="btn" id="clearAnswerBtn" type="button">Clear</button>
             </div>
         </div>
@@ -250,10 +256,13 @@
         const manualClearBtn = document.getElementById('manualClearBtn');
         const manualStatus = document.getElementById('manualStatus');
         const clearAnswerBtn = document.getElementById('clearAnswerBtn');
+        const restoreAnswerBtn = document.getElementById('restoreAnswerBtn');
         const hudStatusEl = document.getElementById('hudStatus');
         const bufferBar = document.getElementById('bufferBar');
         const bufBarText = document.getElementById('bufBarText');
         const undoBtn = document.getElementById('undoBtn');
+
+        let answerUndoStack = [];
 
         let _statusTimer = null;
         function setHudStatus(html) {
@@ -313,9 +322,31 @@
             ipcRenderer.send('overlay-manual-ask', q);
         }
 
+        function isPlaceholder(html) {
+            const trimmed = String(html || '').trim();
+            return trimmed === '' ||
+                   trimmed === '<em>MI5.ai ready. Waiting for intercept...</em>' ||
+                   trimmed === '<em>Cleared.</em>' ||
+                   trimmed === '<em>Cleared</em>';
+        }
+
+        function updateRestoreButtonVisibility() {
+            if (restoreAnswerBtn) {
+                restoreAnswerBtn.style.display = answerUndoStack.length > 0 ? 'inline-block' : 'none';
+            }
+        }
+
         ipcRenderer.on('update-overlay', (event, data) => {
             setHudStatus('');
-            answerEl.innerHTML = data;
+            const currentContent = answerEl.innerHTML;
+            if (!isPlaceholder(currentContent)) {
+                answerUndoStack.push(currentContent);
+                if (answerUndoStack.length > 20) answerUndoStack.shift();
+                updateRestoreButtonVisibility();
+                answerEl.innerHTML = currentContent + '<hr class="mi5-divider">' + data;
+            } else {
+                answerEl.innerHTML = data;
+            }
             answerEl.scrollTo(0, answerEl.scrollHeight);
         });
 
@@ -350,7 +381,26 @@
         });
         manualAskBtn.addEventListener('click', manualAsk);
         manualClearBtn.addEventListener('click', () => { ipcRenderer.send('overlay-bring-to-front'); manualInput.value = ''; manualStatus.textContent = 'Cleared'; manualInput.focus(); });
-        clearAnswerBtn.addEventListener('click', () => { ipcRenderer.send('overlay-bring-to-front'); answerEl.innerHTML = '<em>Cleared.</em>'; setHudStatus(''); });
+        clearAnswerBtn.addEventListener('click', () => {
+            ipcRenderer.send('overlay-bring-to-front');
+            const currentContent = answerEl.innerHTML;
+            if (!isPlaceholder(currentContent)) {
+                answerUndoStack.push(currentContent);
+                if (answerUndoStack.length > 20) answerUndoStack.shift();
+                updateRestoreButtonVisibility();
+            }
+            answerEl.innerHTML = '<em>Cleared.</em>';
+            setHudStatus('');
+        });
+        restoreAnswerBtn.addEventListener('click', () => {
+            ipcRenderer.send('overlay-bring-to-front');
+            if (answerUndoStack.length > 0) {
+                const prevContent = answerUndoStack.pop();
+                answerEl.innerHTML = prevContent;
+                updateRestoreButtonVisibility();
+                answerEl.scrollTo(0, answerEl.scrollHeight);
+            }
+        });
 
         manualInput.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {

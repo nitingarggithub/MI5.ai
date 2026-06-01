@@ -133,6 +133,14 @@ async function run() {
         else                                     t.fail('overlay.html: update-buffer-state', 'listener not found');
         if (ov.includes('overlay-undo-clear'))  t.pass('overlay.html: overlay-undo-clear send present');
         else                                     t.fail('overlay.html: overlay-undo-clear', 'send not found');
+        
+        // Restore/Append checks
+        if (ov.includes('restoreAnswerBtn'))     t.pass('overlay.html: restoreAnswerBtn present');
+        else                                     t.fail('overlay.html: restoreAnswerBtn', 'not found');
+        if (ov.includes('answerUndoStack'))      t.pass('overlay.html: answerUndoStack present');
+        else                                     t.fail('overlay.html: answerUndoStack', 'not found');
+        if (ov.includes('isPlaceholder'))        t.pass('overlay.html: isPlaceholder function present');
+        else                                     t.fail('overlay.html: isPlaceholder', 'not found');
     } else { t.skip('overlay.html checks', 'File not found'); }
 
     // ── clip-selector.html checks ──────────────────────────────────

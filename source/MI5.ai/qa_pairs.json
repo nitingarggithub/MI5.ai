@@ -1,0 +1,11 @@
+[
+  {
+    "id": "mpkx93kywmgn2",
+    "q": "Tell me about yourself",
+    "a": "Hi, I'm Nitin Garg. I have close to 15 years of experience.\nI've built and scaled Virtual Platform and SoC modeling solutions across automotive and advanced compute domains.\n\nMy core expertise is in SystemC/TLM-2.0, C++/Python, and architecture-level modeling.\nI've delivered production IP ( like entire communication stacks CAN-FD, FlexRay, I2C, SPI.) and full virtual platforms for ARM, RH850, and PowerPC-based SoCs \n\nAt Synopsys, I transitioned from hands-on model development into technical leadership—driving digital twin programs and customer engagements with OEMs like Audi and GM.\n\nLater, I architected AI-assisted EDA workflows for secure SoC implementation. I also led cross-geo R&D teams: managing a local team in India while collaborating with large distributed engineering groups and universities globally.\n\nIn my current role at Cadence as Sr. Principal Design Engineer, I'm building a Centralized ESW (Embedded Software) development environment that unifies virtual, hybrid, and RTL platforms\n\n\nAcross all roles, my direction has remained consistent:\nAccelerate pre-silicon software readiness\nImprove model fidelity and performance\nDeliver production-grade platform infrastructure both for internal and customer deployments",
+    "tags": [],
+    "hits": 1,
+    "createdAt": "2026-05-25T08:05:43.906Z",
+    "lastUsed": "2026-05-26T14:28:49.710Z"
+  }
+]
