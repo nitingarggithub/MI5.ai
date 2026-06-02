@@ -968,7 +968,9 @@
                     mandatory: {
                         chromeMediaSource: 'desktop',
                         chromeMediaSourceId: sources[0].id
-                    }
+                    },
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: sources[0].id
                 },
                 video: {
                     mandatory: {
@@ -976,7 +978,11 @@
                         chromeMediaSourceId: sources[0].id,
                         maxWidth: 1,
                         maxHeight: 1
-                    }
+                    },
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: sources[0].id,
+                    maxWidth: 1,
+                    maxHeight: 1
                 }
             });
             // Drop the dummy video track — we only care about audio
@@ -1615,16 +1621,22 @@ ${domainInjection}`;
             }
             updateProviderBadge(visionProvider, '👁 Vision');
 
+            const content = [{ type: 'text', text: systemPrompt }];
+            if (Array.isArray(dataUrl)) {
+                dataUrl.forEach(url => {
+                    content.push({ type: 'image_url', image_url: { url: url } });
+                });
+            } else {
+                content.push({ type: 'image_url', image_url: { url: dataUrl } });
+            }
+
             const response = await fetch(visionUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authKey },
                 body: JSON.stringify({
                     model: visionModel,
                     messages: [{
-                        role: 'user', content: [
-                            { type: 'text', text: systemPrompt },
-                            { type: 'image_url', image_url: { url: dataUrl } }
-                        ]
+                        role: 'user', content: content
                     }],
                     max_tokens: dynamicMaxTokens(),
                     temperature: 0.35
@@ -1650,13 +1662,14 @@ ${domainInjection}`;
         });
 
         // Whisper STT — tuned to reduce silence/noise hallucinations (wrong "YouTube" style text)
-        const WHISPER_CHUNK_NORMAL_MS = 10000;  // 10s in manual mode
-        const WHISPER_CHUNK_SMART_MS = 20000;  // 20s in smart mode (~50% fewer API calls)
+        const WHISPER_CHUNK_NORMAL_MS = 10000;  // 10s — matches Groq 10s billing floor
+        const WHISPER_CHUNK_SMART_MS  = 10000;  // 10s — faster question detection, zero billing waste
         let WHISPER_CHUNK_MS = WHISPER_CHUNK_SMART_MS; // default: smart
         const WHISPER_MIN_BLOB_BYTES = 4800;
         const WHISPER_BUFFER_MAX_CHARS = 1800;
         const TAIL_CHARS = 120; // chars kept as seed after sliding-window clear
         let whisperTranscriptTail = '';
+        let currentChunkMaxVolume = 0; // peak amplitude during current recording chunk
         let whisperChunksOverMin = 0;
         let whisperLinesAccepted = 0;
         let isRecording = false;
@@ -1749,7 +1762,9 @@ ${domainInjection}`;
             'like and comment', 'like and subscribe', 'transcribed by', 'amara.org', 'importance of currency',
             'concept of the universe', 'can you see my face', 'music playing', 'applause', 'subtitle',
             'closed captioning', 'copyright', 'all rights reserved', "i'm going to take a few more questions",
-            'you mean the lt and at modeling', 'okay, you mean the'
+            'you mean the lt and at modeling', 'okay, you mean the',
+            'youtube', 'subscribing', 'watch this video', 'channel', 'sign up', 'email address', 'patreon',
+            'all right guys', 'thank you guys'
         ];
 
         function deLoopTranscript(text) {
@@ -1804,8 +1819,8 @@ ${domainInjection}`;
                     const cr = typeof seg.compression_ratio === 'number' ? seg.compression_ratio : 1;
 
                     // Stricter filtering for high-speed loops
-                    if (ns > 0.45) continue;
-                    if (lp < -1.0) continue;
+                    if (ns > 0.35) continue;
+                    if (lp < -0.8) continue;
                     if (cr > 2.4 || cr < 0.4) {
                         hudStatus('<span style="color:#b58900;">⚠️ High compression detected (hallucination skip)</span>');
                         continue;
@@ -1921,6 +1936,7 @@ ${domainInjection}`;
                     for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
                     const avg = sum / dataArray.length;
                     const pct = Math.min(100, Math.round((avg / 128) * 100));
+                    currentChunkMaxVolume = Math.max(currentChunkMaxVolume, pct);
                     document.getElementById('volumeBar').style.width = pct + '%';
                     document.getElementById('volumeVal').textContent = pct + '%';
                     if (pct > 50) document.getElementById('volumeBar').style.background = '#859900';
@@ -1957,6 +1973,12 @@ ${domainInjection}`;
                 console.log('[Whisper] Audio tracks:', tracks.map(t => t.label + ' enabled=' + t.enabled + ' readyState=' + t.readyState));
                 if (tracks.length === 0) {
                     showStatus('⚠️ No audio tracks in stream — check mic/loopback settings.', '#b58900');
+                } else {
+                    const deadTracks = tracks.filter(t => !t.enabled || t.readyState === 'ended');
+                    if (deadTracks.length > 0) {
+                        showStatus('⚠️ Audio track is disabled or ended — check system capture permissions.', '#b58900');
+                        hudStatus('<span style="color:#b58900;">⚠️ Capture WARNING: Audio track is disabled or ended. Loopback speaker capture might be blocked or inactive.</span>');
+                    }
                 }
 
                 const modeLabel = mode === 'loopback' ? '🔊 Loopback' : mode === 'both' ? '🎙+🔊 Merged' : '🎙 Mic';
@@ -2005,6 +2027,7 @@ ${domainInjection}`;
 
         function runWhisperLoop() {
             if (!isRecording || !audioStream) return;
+            currentChunkMaxVolume = 0; // reset peak volume for this chunk
             const mimeType = pickRecorderMimeType();
             let recorder;
             try {
@@ -2017,6 +2040,13 @@ ${domainInjection}`;
             recorder.onstop = async () => {
                 if (!isRecording) return;
                 const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
+
+                if (currentChunkMaxVolume < 5) {
+                    console.log('[Whisper] Silence bypass triggered. Peak volume: ' + currentChunkMaxVolume + '%');
+                    hudStatus('<span style="color:#93a1a1; font-size: 0.85em;">Listening... [Silence bypass] (Volume: ' + currentChunkMaxVolume + '%)</span>');
+                    runWhisperLoop();
+                    return;
+                }
 
                 if (blob.size >= WHISPER_MIN_BLOB_BYTES) {
                     whisperChunksOverMin++;

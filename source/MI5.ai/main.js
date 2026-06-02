@@ -105,18 +105,39 @@ app.whenReady().then(() => {
 
   globalShortcut.register('CommandOrControl+Shift+S', async () => {
     try {
+        const mainWasVisible = mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible();
+        const overlayWasVisible = overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible();
+
+        if (mainWasVisible) mainWindow.hide();
+        if (overlayWasVisible) overlayWindow.hide();
+
+        // 250ms delay for window manager to hide windows completely
+        await new Promise(resolve => setTimeout(resolve, 250));
+
         const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1920, height: 1080 } });
+
+        if (mainWasVisible) mainWindow.show();
+        if (overlayWasVisible) bringOverlayToFront();
+
         if (sources.length > 0) {
-            const dataUrl = 'data:image/jpeg;base64,' + sources[0].thumbnail.toJPEG(80).toString('base64');
+            const dataUrls = sources.map(src => 'data:image/jpeg;base64,' + src.thumbnail.toJPEG(80).toString('base64'));
+            const payload = dataUrls.length === 1 ? dataUrls[0] : dataUrls;
+
             if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('process-screenshot', dataUrl);
+                mainWindow.webContents.send('process-screenshot', payload);
             }
             if (overlayWindow && !overlayWindow.isDestroyed()) {
                 overlayWindow.webContents.send('update-overlay-status', '<em>Processing screenshot…</em>');
                 if (!overlayWindow.isVisible()) overlayWindow.show();
             }
         }
-    } catch(e) { console.error(e); }
+    } catch(e) { 
+        console.error('Screenshot shortcut error:', e); 
+        try {
+            if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+            if (overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.isVisible()) bringOverlayToFront();
+        } catch(_) {}
+    }
   });
 
   globalShortcut.register('CommandOrControl+Shift+A', () => {
@@ -141,9 +162,22 @@ app.whenReady().then(() => {
   globalShortcut.register('CommandOrControl+Shift+C', async () => {
     try {
       if (clipWindow && !clipWindow.isDestroyed()) { clipWindow.close(); clipWindow = null; return; }
+
+      const mainWasVisible = mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible();
+      const overlayWasVisible = overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible();
+
+      if (mainWasVisible) mainWindow.hide();
+      if (overlayWasVisible) overlayWindow.hide();
+
+      await new Promise(resolve => setTimeout(resolve, 250));
+
       const primaryDisplay = screen.getPrimaryDisplay();
       const { width, height } = primaryDisplay.bounds;
       const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width, height } });
+
+      if (mainWasVisible) mainWindow.show();
+      if (overlayWasVisible) bringOverlayToFront();
+
       if (!sources.length) return;
       const dataUrl = 'data:image/jpeg;base64,' + sources[0].thumbnail.toJPEG(80).toString('base64');
 
@@ -161,36 +195,60 @@ app.whenReady().then(() => {
         clipWindow.webContents.send('set-screenshot', dataUrl, width, height);
       });
       clipWindow.on('closed', () => { clipWindow = null; });
-    } catch(e) { console.error('Clip shortcut error:', e); }
+    } catch(e) { 
+      console.error('Clip shortcut error:', e); 
+      try {
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+        if (overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.isVisible()) bringOverlayToFront();
+      } catch(_) {}
+    }
   });
 
-  ipcMain.on('clip-region-selected', (evt, region) => {
+  ipcMain.on('clip-region-selected', async (evt, region) => {
     try {
       if (clipWindow && !clipWindow.isDestroyed()) { clipWindow.close(); clipWindow = null; }
+
+      const mainWasVisible = mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible();
+      const overlayWasVisible = overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible();
+
+      if (mainWasVisible) mainWindow.hide();
+      if (overlayWasVisible) overlayWindow.hide();
+
+      await new Promise(resolve => setTimeout(resolve, 250));
+
       const primaryDisplay = screen.getPrimaryDisplay();
       const dispW = primaryDisplay.bounds.width;
       const dispH = primaryDisplay.bounds.height;
-      // Use desktopCapturer again for full-res crop
-      desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: dispW, height: dispH } }).then(sources => {
-        if (!sources.length) return;
-        const img = sources[0].thumbnail;
-        const sz = img.getSize();
-        const scaleX = sz.width / dispW;
-        const scaleY = sz.height / dispH;
-        const cropped = img.crop({
-          x: Math.max(0, Math.round(region.x * scaleX)),
-          y: Math.max(0, Math.round(region.y * scaleY)),
-          width: Math.min(sz.width, Math.round(region.w * scaleX)),
-          height: Math.min(sz.height, Math.round(region.h * scaleY))
-        });
-        const croppedUrl = 'data:image/jpeg;base64,' + cropped.toJPEG(85).toString('base64');
-        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('process-screenshot', croppedUrl);
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          overlayWindow.webContents.send('update-overlay-status', '<em style="color:#d33682;">🔍 Scanning clipped region…</em>');
-          if (!overlayWindow.isVisible()) overlayWindow.show();
-        }
+      
+      const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: dispW, height: dispH } });
+
+      if (mainWasVisible) mainWindow.show();
+      if (overlayWasVisible) bringOverlayToFront();
+
+      if (!sources.length) return;
+      const img = sources[0].thumbnail;
+      const sz = img.getSize();
+      const scaleX = sz.width / dispW;
+      const scaleY = sz.height / dispH;
+      const cropped = img.crop({
+        x: Math.max(0, Math.round(region.x * scaleX)),
+        y: Math.max(0, Math.round(region.y * scaleY)),
+        width: Math.min(sz.width, Math.round(region.w * scaleX)),
+        height: Math.min(sz.height, Math.round(region.h * scaleY))
       });
-    } catch(e) { console.error('clip-region-selected error:', e); }
+      const croppedUrl = 'data:image/jpeg;base64,' + cropped.toJPEG(85).toString('base64');
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('process-screenshot', croppedUrl);
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.webContents.send('update-overlay-status', '<em style="color:#d33682;">🔍 Scanning clipped region…</em>');
+        if (!overlayWindow.isVisible()) overlayWindow.show();
+      }
+    } catch(e) { 
+      console.error('clip-region-selected error:', e); 
+      try {
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+        if (overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.isVisible()) bringOverlayToFront();
+      } catch(_) {}
+    }
   });
 
   ipcMain.on('clip-cancelled', () => {
